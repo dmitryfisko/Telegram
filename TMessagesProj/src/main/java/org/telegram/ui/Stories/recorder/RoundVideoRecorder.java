@@ -9,11 +9,9 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
-import android.widget.ViewAnimator;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.UserConfig;
@@ -22,7 +20,6 @@ import org.telegram.messenger.camera.CameraController;
 import org.telegram.messenger.camera.CameraView;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.CubicBezierInterpolator;
-import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.Paint.Views.RoundView;
 
 import java.io.File;
@@ -75,7 +72,7 @@ public class RoundVideoRecorder extends FrameLayout {
         cameraView.setScaleX(0f);
         cameraView.setScaleY(0f);
         addView(cameraView);
-        cameraView.setDelegate(() -> {
+        cameraView.addDelegate(() -> {
             if (recordingStarted > 0) return;
             CameraController.getInstance().recordVideo(cameraView.getCameraSessionObject(), file, false, (thumbPath, duration) -> {
                 recordingStopped = System.currentTimeMillis();

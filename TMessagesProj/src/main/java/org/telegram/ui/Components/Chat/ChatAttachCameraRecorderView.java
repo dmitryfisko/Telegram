@@ -29,7 +29,6 @@ import android.graphics.Matrix;
 import android.graphics.Outline;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.graphics.PixelFormat;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.PorterDuffXfermode;
@@ -113,9 +112,7 @@ import org.telegram.ui.ActionBar.SimpleTextView;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.AvatarSpan;
 import org.telegram.ui.Cells.ChatMessageCell;
-import org.telegram.ui.Cells.ShareDialogCell;
 import org.telegram.ui.Components.AlertsCreator;
-import org.telegram.ui.Components.BackupImageView;
 import org.telegram.ui.Components.BlurringShader;
 import org.telegram.ui.Components.Bulletin;
 import org.telegram.ui.Components.BulletinFactory;
@@ -133,6 +130,7 @@ import org.telegram.ui.Components.Paint.Views.PhotoView;
 import org.telegram.ui.Components.Paint.Views.RoundView;
 import org.telegram.ui.Components.PhotoFilterBlurControl;
 import org.telegram.ui.Components.PhotoFilterCurvesControl;
+import org.telegram.ui.Components.PhotoFilterTouchable;
 import org.telegram.ui.Components.PhotoFilterView;
 import org.telegram.ui.Components.Premium.LimitReachedBottomSheet;
 import org.telegram.ui.Components.Premium.PremiumFeatureBottomSheet;
@@ -147,12 +145,8 @@ import org.telegram.ui.Components.WaveDrawable;
 import org.telegram.ui.Components.ZoomControlView;
 import org.telegram.ui.LaunchActivity;
 import org.telegram.ui.PremiumPreviewFragment;
-import org.telegram.ui.ProfileActivity;
 import org.telegram.ui.Stories.DarkThemeResourceProvider;
-import org.telegram.ui.Stories.DialogStoriesCell;
-import org.telegram.ui.Stories.PeerStoriesView;
 import org.telegram.ui.Stories.StoriesController;
-import org.telegram.ui.Stories.StoryViewer;
 import org.telegram.ui.Stories.StoryWaveEffectView;
 import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
 import org.telegram.ui.Stories.recorder.CaptionStory;
@@ -195,7 +189,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class ChatAttachCameraRecorder implements NotificationCenter.NotificationCenterDelegate {
+public class ChatAttachCameraRecorderView extends FrameLayout implements NotificationCenter.NotificationCenterDelegate {
 
     private final Theme.ResourcesProvider resourcesProvider = new DarkThemeResourceProvider();
 
@@ -205,70 +199,26 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
     private boolean isShown;
     private boolean prepareClosing;
 
-    WindowManager windowManager;
-    private final WindowManager.LayoutParams windowLayoutParams;
     private WindowView windowView;
     private ContainerView containerView;
     private FlashViews flashViews;
     private ThanosEffect thanosEffect;
 
-    private static ChatAttachCameraRecorder instance;
     private boolean wasSend;
     private long wasSendPeer = 0;
     private ClosingViewProvider closingSourceProvider;
     private Runnable closeListener;
 
-    public static ChatAttachCameraRecorder getInstance(Activity activity, int currentAccount) {
-        if (instance != null && (instance.activity != activity || instance.currentAccount != currentAccount)) {
-            instance.close(false);
-            instance = null;
-        }
-        if (instance == null) {
-            instance = new ChatAttachCameraRecorder(activity, currentAccount);
-        }
-        return instance;
-    }
+    public ChatAttachCameraRecorderView(Context context, int currentAccount) {
+        super(context);
 
-    public static void destroyInstance() {
-        if (instance != null) {
-            instance.close(false);
-        }
-        instance = null;
-    }
-
-    public static boolean isVisible() {
-        return instance != null && instance.isShown;
-    }
-    public ChatAttachCameraRecorder(Activity activity, int currentAccount) {
-        this.activity = activity;
+        this.activity = AndroidUtilities.getActivity();
         this.currentAccount = currentAccount;
-
-        windowLayoutParams = new WindowManager.LayoutParams();
-        windowLayoutParams.height = WindowManager.LayoutParams.MATCH_PARENT;
-        windowLayoutParams.width = WindowManager.LayoutParams.MATCH_PARENT;
-        windowLayoutParams.format = PixelFormat.TRANSLUCENT;
-        windowLayoutParams.gravity = Gravity.TOP | Gravity.LEFT;
-        windowLayoutParams.type = WindowManager.LayoutParams.LAST_APPLICATION_WINDOW;
-        if (Build.VERSION.SDK_INT >= 28) {
-            windowLayoutParams.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
-        }
-        windowLayoutParams.flags = (
-            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN |
-            WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR |
-            WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION
-        );
-        if (Build.VERSION.SDK_INT >= 21) {
-            windowLayoutParams.flags |= WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS;
-        }
-        windowLayoutParams.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE;
-
-        windowManager = (WindowManager) activity.getSystemService(Context.WINDOW_SERVICE);
 
         initViews();
     }
 
     private ValueAnimator openCloseAnimator;
-    private SourceView fromSourceView;
     private float fromRounding;
     private final RectF fromRect = new RectF();
     private float openProgress;
@@ -278,295 +228,19 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
     private boolean canChangePeer = true;
     long selectedDialogId;
 
-    public static class SourceView {
-
-        int type = 0;
-        float rounding;
-        RectF screenRect = new RectF();
-        Drawable backgroundDrawable;
-        ImageReceiver backgroundImageReceiver;
-        boolean hasShadow;
-        Paint backgroundPaint;
-        Drawable iconDrawable;
-        int iconSize;
-        View view;
-
-        protected void show(boolean sent) {}
-        protected void hide() {}
-        protected void drawAbove(Canvas canvas, float alpha) {}
-
-        public static SourceView fromAvatarImage(ProfileActivity.AvatarImageView avatarImage, boolean isForum) {
-            if (avatarImage == null || avatarImage.getRootView() == null) {
-                return null;
-            }
-            float scale = ((View)avatarImage.getParent()).getScaleX();
-            final float size = avatarImage.getImageReceiver().getImageWidth() * scale;
-            final float rounding = isForum ? size * 0.32f : size;
-            SourceView src = new SourceView() {
-                @Override
-                protected void show(boolean sent) {
-                    avatarImage.drawAvatar = true;
-                    avatarImage.invalidate();
-                }
-
-                @Override
-                protected void hide() {
-                    avatarImage.drawAvatar = false;
-                    avatarImage.invalidate();
-                }
-            };
-            final int[] loc = new int[2];
-            final float[] locPositon = new float[2];
-            avatarImage.getRootView().getLocationOnScreen(loc);
-            AndroidUtilities.getViewPositionInParent(avatarImage, (ViewGroup) avatarImage.getRootView(), locPositon);
-            final float x = loc[0] + locPositon[0] + avatarImage.getImageReceiver().getImageX() * scale;
-            final float y = loc[1] + locPositon[1] + avatarImage.getImageReceiver().getImageY() * scale;
-
-            src.screenRect.set(x, y, x + size, y + size);
-            src.backgroundImageReceiver = avatarImage.getImageReceiver();
-            src.rounding = rounding;
-            return src;
-        }
-
-        public static SourceView fromStoryViewer(StoryViewer storyViewer) {
-            if (storyViewer == null) {
-                return null;
-            }
-            SourceView src = new SourceView() {
-                @Override
-                protected void show(boolean sent) {
-                    final PeerStoriesView peerView = storyViewer.getCurrentPeerView();
-                    if (peerView != null) {
-                        peerView.animateOut(false);
-                    }
-                    if (view != null) {
-                        view.setTranslationX(0);
-                        view.setTranslationY(0);
-                    }
-                }
-
-                @Override
-                protected void hide() {
-                    final PeerStoriesView peerView = storyViewer.getCurrentPeerView();
-                    if (peerView != null) {
-                        peerView.animateOut(true);
-                    }
-                }
-            };
-            if (!storyViewer.getStoryRect(src.screenRect)) {
-                return null;
-            }
-            src.type = 1;
-            src.rounding = dp(8);
-            final PeerStoriesView peerView = storyViewer.getCurrentPeerView();
-            if (peerView != null) {
-                src.view = peerView.storyContainer;
-            }
-            return src;
-        }
-
-        public static SourceView fromFloatingButton(FrameLayout floatingButton) {
-            if (floatingButton == null) {
-                return null;
-            }
-            SourceView src = new SourceView() {
-                @Override
-                protected void show(boolean sent) {
-                    floatingButton.setVisibility(View.VISIBLE);
-                }
-                @Override
-                protected void hide() {
-                    floatingButton.post(() -> {
-                        floatingButton.setVisibility(View.GONE);
-                    });
-                }
-            };
-            int[] loc = new int[2];
-            final View imageView = floatingButton.getChildAt(0);
-            imageView.getLocationOnScreen(loc);
-            src.screenRect.set(loc[0], loc[1], loc[0] + imageView.getWidth(), loc[1] + imageView.getHeight());
-            src.hasShadow = true;
-            src.backgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            src.backgroundPaint.setColor(Theme.getColor(Theme.key_chats_actionBackground));
-            src.iconDrawable = floatingButton.getContext().getResources().getDrawable(R.drawable.story_camera).mutate();
-            src.iconSize = AndroidUtilities.dp(56);
-            src.rounding = Math.max(src.screenRect.width(), src.screenRect.height()) / 2f;
-            return src;
-        }
-
-        public static SourceView fromShareCell(ShareDialogCell shareDialogCell) {
-            if (shareDialogCell == null) {
-                return null;
-            }
-            BackupImageView imageView = shareDialogCell.getImageView();
-            SourceView src = new SourceView() {
-                @Override
-                protected void show(boolean sent) {
-                    imageView.setVisibility(View.VISIBLE);
-                }
-                @Override
-                protected void hide() {
-                    imageView.post(() -> {
-                        imageView.setVisibility(View.GONE);
-                    });
-                }
-            };
-            int[] loc = new int[2];
-            imageView.getLocationOnScreen(loc);
-            src.screenRect.set(loc[0], loc[1], loc[0] + imageView.getWidth(), loc[1] + imageView.getHeight());
-            src.backgroundDrawable = new ShareDialogCell.RepostStoryDrawable(imageView.getContext(), null, false, shareDialogCell.resourcesProvider);
-//            src.hasShadow = false;
-//            src.backgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-//            src.backgroundPaint.setColor(Theme.getColor(Theme.key_chats_actionBackground));
-//            src.iconDrawable = shareDialogCell.getContext().getResources().getDrawable(R.drawable.large_repost_story).mutate();
-//            src.iconSize = AndroidUtilities.dp(30);
-            src.rounding = Math.max(src.screenRect.width(), src.screenRect.height()) / 2f;
-            return src;
-        }
-
-        public static SourceView fromStoryCell(DialogStoriesCell.StoryCell storyCell) {
-            if (storyCell == null || storyCell.getRootView() == null) {
-                return null;
-            }
-            final float size = storyCell.avatarImage.getImageWidth();
-            final float radius = size / 2f;
-            SourceView src = new SourceView() {
-                @Override
-                protected void show(boolean sent) {
-                    storyCell.drawAvatar = true;
-                    storyCell.invalidate();
-                    if (sent) {
-                        final int[] loc = new int[2];
-                        storyCell.getLocationInWindow(loc);
-                        LaunchActivity.makeRipple(loc[0] + storyCell.getWidth() / 2f, loc[1] + storyCell.getHeight() / 2f, 1f);
-                    }
-                }
-
-                @Override
-                protected void hide() {
-                    storyCell.post(() -> {
-                        storyCell.drawAvatar = false;
-                        storyCell.invalidate();
-                    });
-                }
-
-                @Override
-                protected void drawAbove(Canvas canvas, float alpha) {
-                    storyCell.drawPlus(canvas, radius, radius, (float) Math.pow(alpha, 16));
-                }
-            };
-            final int[] loc = new int[2];
-            final float[] locPositon = new float[2];
-            storyCell.getRootView().getLocationOnScreen(loc);
-            AndroidUtilities.getViewPositionInParent(storyCell, (ViewGroup) storyCell.getRootView(), locPositon);
-            final float x = loc[0] + locPositon[0] + storyCell.avatarImage.getImageX();
-            final float y = loc[1] + locPositon[1] + storyCell.avatarImage.getImageY();
-
-            src.screenRect.set(x, y, x + size, y + size);
-            src.backgroundImageReceiver = storyCell.avatarImage;
-            src.rounding = Math.max(src.screenRect.width(), src.screenRect.height()) / 2f;
-            return src;
-        }
-    }
-
-    public ChatAttachCameraRecorder whenSent(Runnable listener) {
+    public ChatAttachCameraRecorderView whenSent(Runnable listener) {
         closeListener = listener;
         return this;
     }
 
-    public ChatAttachCameraRecorder closeToWhenSent(ClosingViewProvider closingSourceProvider) {
+    public ChatAttachCameraRecorderView closeToWhenSent(ClosingViewProvider closingSourceProvider) {
         this.closingSourceProvider = closingSourceProvider;
         return this;
     }
 
-    public void replaceSourceView(SourceView sourceView) {
-        if (sourceView != null) {
-            fromSourceView = sourceView;
-            openType = sourceView.type;
-            fromRect.set(sourceView.screenRect);
-            fromRounding = sourceView.rounding;
-        } else {
-            fromSourceView = null;
-            openType = 0;
-            fromRect.set(0, dp(100), AndroidUtilities.displaySize.x, dp(100) + AndroidUtilities.displaySize.y);
-            fromRounding = dp(8);
-        }
-        previewContainer.setBackgroundColor(openType == 1 || openType == 0 ? 0 : 0xff1f1f1f);
-    }
+    private static boolean firstOpen = true;
 
-    public void openBot(long botId, String lang_code, SourceView sourceView) {
-        this.botId = botId;
-        this.botLang = lang_code;
-        this.botEdit = null;
-        open(sourceView, true);
-        this.botId = botId;
-        this.botLang = lang_code;
-    }
-
-    public void openBotEntry(long botId, String lang_code, StoryEntry entry, SourceView sourceView) {
-        if (isShown || entry == null) {
-            return;
-        }
-
-        this.botId = botId;
-        this.botLang = lang_code;
-
-        isReposting = false;
-        prepareClosing = false;
-        forceBackgroundVisible = false;
-
-        if (windowManager != null && windowView != null && windowView.getParent() == null) {
-            AndroidUtilities.setPreferredMaxRefreshRate(windowManager, windowView, windowLayoutParams);
-            windowManager.addView(windowView, windowLayoutParams);
-        }
-
-        outputEntry = entry;
-        outputEntry.botId = botId;
-        outputEntry.botLang = lang_code;
-        isVideo = outputEntry != null && outputEntry.isVideo;
-        videoTextureHolder.active = false;
-
-        if (sourceView != null) {
-            fromSourceView = sourceView;
-            openType = sourceView.type;
-            fromRect.set(sourceView.screenRect);
-            fromRounding = sourceView.rounding;
-            fromSourceView.hide();
-        } else {
-            openType = 0;
-            fromRect.set(0, dp(100), AndroidUtilities.displaySize.x, dp(100) + AndroidUtilities.displaySize.y);
-            fromRounding = dp(8);
-        }
-        containerView.updateBackground();
-        previewContainer.setBackgroundColor(openType == 1 || openType == 0 ? 0 : 0xff1f1f1f);
-
-        containerView.setTranslationX(0);
-        containerView.setTranslationY(0);
-        containerView.setTranslationY2(0);
-        containerView.setScaleX(1f);
-        containerView.setScaleY(1f);
-        dismissProgress = 0;
-
-        AndroidUtilities.lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-
-        if (outputEntry != null) {
-            captionEdit.setText(outputEntry.caption);
-        }
-
-        navigateTo(PAGE_PREVIEW, false);
-        switchToEditMode(EDIT_MODE_NONE, false);
-        previewButtons.appear(false, false);
-
-        previewButtons.appear(true, true);
-        animateOpenTo(1, true, this::onOpenDone);
-        addNotificationObservers();
-    }
-
-    public void open(SourceView sourceView) {
-        open(sourceView, true);
-    }
-
-    public void open(SourceView sourceView, boolean animated) {
+    public void open(boolean animated) {
         if (isShown) {
             return;
         }
@@ -577,10 +251,11 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
         forceBackgroundVisible = false;
         videoTextureHolder.active = false;
 
-        if (windowManager != null && windowView != null && windowView.getParent() == null) {
-            AndroidUtilities.setPreferredMaxRefreshRate(windowManager, windowView, windowLayoutParams);
-            windowManager.addView(windowView, windowLayoutParams);
-        }
+        // TODO
+//        if (windowManager != null && windowView != null && windowView.getParent() == null) {
+//            AndroidUtilities.setPreferredMaxRefreshRate(windowManager, windowView, windowLayoutParams);
+//            windowManager.addView(windowView, windowLayoutParams);
+//        }
 
         cameraViewThumb.setImageDrawable(getCameraThumb());
 
@@ -594,17 +269,10 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
         navigateTo(PAGE_CAMERA, false);
         switchToEditMode(EDIT_MODE_NONE, false);
 
-        if (sourceView != null) {
-            fromSourceView = sourceView;
-            openType = sourceView.type;
-            fromRect.set(sourceView.screenRect);
-            fromRounding = sourceView.rounding;
-            fromSourceView.hide();
-        } else {
-            openType = 0;
-            fromRect.set(0, dp(100), AndroidUtilities.displaySize.x, dp(100) + AndroidUtilities.displaySize.y);
-            fromRounding = dp(8);
-        }
+        openType = 0;
+        fromRect.set(0, dp(100), AndroidUtilities.displaySize.x, dp(100) + AndroidUtilities.displaySize.y);
+        fromRounding = dp(8);
+
         containerView.updateBackground();
         previewContainer.setBackgroundColor(openType == 1 || openType == 0 ? 0 : 0xff1f1f1f);
 
@@ -618,193 +286,6 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
         AndroidUtilities.lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
         animateOpenTo(1, animated, this::onOpenDone);
-
-        addNotificationObservers();
-
-        botId = 0;
-        botLang = "";
-        botEdit = null;
-    }
-
-    public void openEdit(SourceView sourceView, StoryEntry entry, long time, boolean animated) {
-        if (isShown) {
-            return;
-        }
-
-        isReposting = false;
-        prepareClosing = false;
-        forceBackgroundVisible = false;
-
-        if (windowManager != null && windowView != null && windowView.getParent() == null) {
-            AndroidUtilities.setPreferredMaxRefreshRate(windowManager, windowView, windowLayoutParams);
-            windowManager.addView(windowView, windowLayoutParams);
-        }
-
-        outputEntry = entry;
-        isVideo = outputEntry != null && outputEntry.isVideo;
-        videoTextureHolder.active = false;
-
-        if (sourceView != null) {
-            fromSourceView = sourceView;
-            openType = sourceView.type;
-            fromRect.set(sourceView.screenRect);
-            fromRounding = sourceView.rounding;
-            fromSourceView.hide();
-        } else {
-            openType = 0;
-            fromRect.set(0, dp(100), AndroidUtilities.displaySize.x, dp(100) + AndroidUtilities.displaySize.y);
-            fromRounding = dp(8);
-        }
-        containerView.updateBackground();
-        previewContainer.setBackgroundColor(openType == 1 || openType == 0 ? 0 : 0xff1f1f1f);
-
-        containerView.setTranslationX(0);
-        containerView.setTranslationY(0);
-        containerView.setTranslationY2(0);
-        containerView.setScaleX(1f);
-        containerView.setScaleY(1f);
-        dismissProgress = 0;
-
-        AndroidUtilities.lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-
-        if (outputEntry != null) {
-            captionEdit.setText(outputEntry.caption);
-        }
-
-        navigateToPreviewWithPlayerAwait(() -> {
-            animateOpenTo(1, animated, this::onOpenDone);
-            previewButtons.appear(true, true);
-        }, time);
-        navigateTo(outputEntry.isEditingCover ? PAGE_COVER : PAGE_PREVIEW, false);
-        switchToEditMode(EDIT_MODE_NONE, false);
-        previewButtons.appear(false, false);
-
-        addNotificationObservers();
-
-        botId = 0;
-        botLang = "";
-        botEdit = null;
-    }
-
-    public void openForward(SourceView sourceView, StoryEntry entry, long time, boolean animated) {
-        if (isShown) {
-            return;
-        }
-
-        isReposting = false;
-        prepareClosing = false;
-        forceBackgroundVisible = false;
-
-        if (windowManager != null && windowView != null && windowView.getParent() == null) {
-            AndroidUtilities.setPreferredMaxRefreshRate(windowManager, windowView, windowLayoutParams);
-            windowManager.addView(windowView, windowLayoutParams);
-        }
-
-        outputEntry = entry;
-        StoryPrivacySelector.applySaved(currentAccount, outputEntry);
-        isVideo = outputEntry != null && outputEntry.isVideo;
-        videoTextureHolder.active = false;
-
-        if (sourceView != null) {
-            fromSourceView = sourceView;
-            openType = sourceView.type;
-            fromRect.set(sourceView.screenRect);
-            fromRounding = sourceView.rounding;
-            fromSourceView.hide();
-        } else {
-            openType = 0;
-            fromRect.set(0, dp(100), AndroidUtilities.displaySize.x, dp(100) + AndroidUtilities.displaySize.y);
-            fromRounding = dp(8);
-        }
-        containerView.updateBackground();
-        previewContainer.setBackgroundColor(openType == 1 || openType == 0 ? 0 : 0xff1f1f1f);
-
-        containerView.setTranslationX(0);
-        containerView.setTranslationY(0);
-        containerView.setTranslationY2(0);
-        containerView.setScaleX(1f);
-        containerView.setScaleY(1f);
-        dismissProgress = 0;
-
-        AndroidUtilities.lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-
-        if (outputEntry != null) {
-            captionEdit.setText(outputEntry.caption);
-        }
-
-        navigateToPreviewWithPlayerAwait(() -> {
-            animateOpenTo(1, animated, this::onOpenDone);
-        }, time);
-        previewButtons.appear(true, false);
-        navigateTo(PAGE_PREVIEW, false);
-        switchToEditMode(EDIT_MODE_NONE, false);
-
-        addNotificationObservers();
-
-        botId = 0;
-        botLang = "";
-        botEdit = null;
-    }
-
-    private static boolean firstOpen = true;
-    public void openRepost(SourceView sourceView, StoryEntry entry) {
-        if (isShown) {
-            return;
-        }
-
-        isReposting = true;
-        prepareClosing = false;
-        forceBackgroundVisible = false;
-
-        if (windowManager != null && windowView != null && windowView.getParent() == null) {
-            AndroidUtilities.setPreferredMaxRefreshRate(windowManager, windowView, windowLayoutParams);
-            windowManager.addView(windowView, windowLayoutParams);
-        }
-
-        outputEntry = entry;
-        StoryPrivacySelector.applySaved(currentAccount, outputEntry);
-        isVideo = outputEntry != null && outputEntry.isVideo;
-        videoTextureHolder.active = outputEntry != null && outputEntry.isRepostMessage && isVideo;
-
-        if (botId == 0) {
-            StoriesController.StoryLimit storyLimit = MessagesController.getInstance(currentAccount).getStoriesController().checkStoryLimit();
-            if (storyLimit != null && storyLimit.active(currentAccount)) {
-                showLimitReachedSheet(storyLimit, true);
-            }
-        }
-
-        if (sourceView != null) {
-            fromSourceView = sourceView;
-            openType = sourceView.type;
-            fromRect.set(sourceView.screenRect);
-            fromRounding = sourceView.rounding;
-            fromSourceView.hide();
-        } else {
-            openType = 0;
-            fromRect.set(0, dp(100), AndroidUtilities.displaySize.x, dp(100) + AndroidUtilities.displaySize.y);
-            fromRounding = dp(8);
-        }
-
-        containerView.updateBackground();
-        previewContainer.setBackgroundColor(openType == 1 || openType == 0 ? 0 : 0xff1f1f1f);
-
-        containerView.setTranslationX(0);
-        containerView.setTranslationY(0);
-        containerView.setTranslationY2(0);
-        containerView.setScaleX(1f);
-        containerView.setScaleY(1f);
-        dismissProgress = 0;
-
-        AndroidUtilities.lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-
-        if (outputEntry != null) {
-            captionEdit.setText(outputEntry.caption);
-        }
-
-        previewButtons.appear(true, false);
-        navigateTo(PAGE_PREVIEW, false);
-        switchToEditMode(EDIT_MODE_NONE, false);
-        animateOpenTo(1, true, this::onOpenDone);
 
         addNotificationObservers();
 
@@ -891,10 +372,6 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
                     windowView.invalidate();
                     if (onDone != null) {
                         onDone.run();
-                    }
-                    if (fromSourceView != null && waveEffect != null) {
-                        waveEffect.start();
-                        waveEffect = null;
                     }
                     notificationsLocker.unlock();
                     NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.startAllHeavyOperations, 512);
@@ -990,25 +467,15 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
         if (outputFile != null && !wasSend) {
             try {
                 outputFile.delete();
-            } catch (Exception ignore) {}
+            } catch (Exception ignore) {
+            }
         }
         outputFile = null;
-        AndroidUtilities.runOnUIThread(() -> {
-            if (windowManager != null && windowView != null && windowView.getParent() != null) {
-                windowManager.removeView(windowView);
-            }
-        }, 16);
-        if (fromSourceView != null) {
-            fromSourceView.show(false);
-        }
         if (whenOpenDone != null) {
             whenOpenDone = null;
         }
         lastGalleryScrollPosition = null;
-        if (instance != null) {
-            instance.close(false);
-        }
-        instance = null;
+        close(false);
 
         if (onCloseListener != null) {
             onCloseListener.run();
@@ -1026,16 +493,19 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
     }
 
     private Runnable onCloseListener;
+
     public void setOnCloseListener(Runnable listener) {
         onCloseListener = listener;
     }
 
     private Runnable onFullyOpenListener;
+
     public void setOnFullyOpenListener(Runnable listener) {
         onFullyOpenListener = listener;
     }
 
     private Utilities.Callback4<Long, Runnable, Boolean, Long> onClosePrepareListener;
+
     public void setOnPrepareCloseListener(Utilities.Callback4<Long, Runnable, Boolean, Long> listener) {
         onClosePrepareListener = listener;
     }
@@ -1050,6 +520,7 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
     private final RectF rectF = new RectF(), fullRectF = new RectF();
     private final Path clipPath = new Path();
     private final Rect rect = new Rect();
+
     private void applyOpenProgress() {
         if (openType != 1) return;
         fullRectF.set(previewContainer.getLeft(), previewContainer.getTop(), previewContainer.getMeasuredWidth(), previewContainer.getMeasuredHeight());
@@ -1058,10 +529,6 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
         previewContainer.setAlpha(openProgress);
         previewContainer.setTranslationX(rectF.left - previewContainer.getLeft() - containerView.getX());
         previewContainer.setTranslationY(rectF.top - previewContainer.getTop() - containerView.getY());
-        if (fromSourceView != null && fromSourceView.view != null) {
-            fromSourceView.view.setTranslationX((fullRectF.left - fromRect.left) * openProgress);
-            fromSourceView.view.setTranslationY((fullRectF.top - fromRect.top) * openProgress);
-        }
         previewContainer.setScaleX(rectF.width() / previewContainer.getMeasuredWidth());
         previewContainer.setScaleY(rectF.height() / previewContainer.getMeasuredHeight());
         actionBarContainer.setAlpha(openProgress);
@@ -1134,50 +601,6 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
             if (restore) {
                 canvas.restore();
                 canvas.restore();
-
-                if (fromSourceView != null) {
-                    final float alpha = Utilities.clamp(1f - openProgress * 1.5f, 1, 0);
-                    final float bcx = rectF.centerX(),
-                            bcy = rectF.centerY(),
-                            br = Math.min(rectF.width(), rectF.height()) / 2f;
-                    if (fromSourceView.backgroundImageReceiver != null) {
-                        fromSourceView.backgroundImageReceiver.setImageCoords(rectF);
-                        int prevRoundRadius = fromSourceView.backgroundImageReceiver.getRoundRadius()[0];
-                        fromSourceView.backgroundImageReceiver.setRoundRadius((int) r);
-                        fromSourceView.backgroundImageReceiver.setAlpha(alpha);
-                        fromSourceView.backgroundImageReceiver.draw(canvas);
-                        fromSourceView.backgroundImageReceiver.setRoundRadius(prevRoundRadius);
-                    } else if (fromSourceView.backgroundDrawable != null) {
-                        fromSourceView.backgroundDrawable.setBounds((int) rectF.left, (int) rectF.top, (int) rectF.right, (int) rectF.bottom);
-                        fromSourceView.backgroundDrawable.setAlpha((int) (0xFF * alpha * alpha * alpha));
-                        fromSourceView.backgroundDrawable.draw(canvas);
-                    } else if (fromSourceView.backgroundPaint != null) {
-                        if (fromSourceView.hasShadow) {
-                            fromSourceView.backgroundPaint.setShadowLayer(dp(2), 0, dp(3), Theme.multAlpha(0x33000000, alpha));
-                        }
-                        fromSourceView.backgroundPaint.setAlpha((int) (0xFF * alpha));
-                        canvas.drawRoundRect(rectF, r, r, fromSourceView.backgroundPaint);
-                    }
-                    if (fromSourceView.iconDrawable != null) {
-                        rect.set(fromSourceView.iconDrawable.getBounds());
-                        fromSourceView.iconDrawable.setBounds(
-                            (int) (bcx - fromSourceView.iconSize / 2),
-                            (int) (bcy - fromSourceView.iconSize / 2),
-                            (int) (bcx + fromSourceView.iconSize / 2),
-                            (int) (bcy + fromSourceView.iconSize / 2)
-                        );
-                        int wasAlpha = fromSourceView.iconDrawable.getAlpha();
-                        fromSourceView.iconDrawable.setAlpha((int) (wasAlpha * alpha));
-                        fromSourceView.iconDrawable.draw(canvas);
-                        fromSourceView.iconDrawable.setBounds(rect);
-                        fromSourceView.iconDrawable.setAlpha(wasAlpha);
-                    }
-
-                    canvas.save();
-                    canvas.translate(fromRect.left, fromRect.top);
-                    fromSourceView.drawAbove(canvas, alpha);
-                    canvas.restore();
-                }
             }
         }
 
@@ -1237,6 +660,7 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
         }
 
         private boolean scaling = false;
+
         private final class ScaleListener extends ScaleGestureDetector.SimpleOnScaleGestureListener {
             @Override
             public boolean onScale(ScaleGestureDetector detector) {
@@ -1444,7 +868,9 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
             public boolean hasDoubleTap(MotionEvent e) {
                 return currentPage == PAGE_CAMERA && cameraView != null && !awaitingPlayer && cameraView.isInited() && !takingPhoto && !recordControl.isTouch() && !isGalleryOpen() && galleryListViewOpening == null;
             }
-        };
+        }
+
+        ;
 
         private boolean ignoreLayout;
 
@@ -1484,23 +910,23 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
             setSystemUiVisibility(flags);
 
             containerView.measure(
-                MeasureSpec.makeMeasureSpec(previewW, MeasureSpec.EXACTLY),
-                MeasureSpec.makeMeasureSpec(previewH + underControls, MeasureSpec.EXACTLY)
+                    MeasureSpec.makeMeasureSpec(previewW, MeasureSpec.EXACTLY),
+                    MeasureSpec.makeMeasureSpec(previewH + underControls, MeasureSpec.EXACTLY)
             );
             flashViews.backgroundView.measure(
-                MeasureSpec.makeMeasureSpec(W, MeasureSpec.EXACTLY),
-                MeasureSpec.makeMeasureSpec(H, MeasureSpec.EXACTLY)
+                    MeasureSpec.makeMeasureSpec(W, MeasureSpec.EXACTLY),
+                    MeasureSpec.makeMeasureSpec(H, MeasureSpec.EXACTLY)
             );
             if (thanosEffect != null) {
                 thanosEffect.measure(
-                    MeasureSpec.makeMeasureSpec(W, MeasureSpec.EXACTLY),
-                    MeasureSpec.makeMeasureSpec(H, MeasureSpec.EXACTLY)
+                        MeasureSpec.makeMeasureSpec(W, MeasureSpec.EXACTLY),
+                        MeasureSpec.makeMeasureSpec(H, MeasureSpec.EXACTLY)
                 );
             }
             if (changeDayNightView != null) {
                 changeDayNightView.measure(
-                    MeasureSpec.makeMeasureSpec(W, MeasureSpec.EXACTLY),
-                    MeasureSpec.makeMeasureSpec(H, MeasureSpec.EXACTLY)
+                        MeasureSpec.makeMeasureSpec(W, MeasureSpec.EXACTLY),
+                        MeasureSpec.makeMeasureSpec(H, MeasureSpec.EXACTLY)
                 );
             }
             if (themeSheet != null) {
@@ -1520,8 +946,8 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
                 }
                 if (emojiView != null) {
                     emojiView.measure(
-                        MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY),
-                        MeasureSpec.makeMeasureSpec(emojiView.getLayoutParams().height, MeasureSpec.EXACTLY)
+                            MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY),
+                            MeasureSpec.makeMeasureSpec(emojiView.getLayoutParams().height, MeasureSpec.EXACTLY)
                     );
                 }
             }
@@ -1545,13 +971,13 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
                 View child = getChildAt(i);
                 if (child instanceof DownloadButton.PreparingVideoToast) {
                     child.measure(
-                        MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY),
-                        MeasureSpec.makeMeasureSpec(H, MeasureSpec.EXACTLY)
+                            MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY),
+                            MeasureSpec.makeMeasureSpec(H, MeasureSpec.EXACTLY)
                     );
                 } else if (child instanceof Bulletin.ParentLayout) {
                     child.measure(
-                        MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY),
-                        MeasureSpec.makeMeasureSpec(Math.min(dp(340), H - (underStatusBar ? 0 : statusbar)), MeasureSpec.EXACTLY)
+                            MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY),
+                            MeasureSpec.makeMeasureSpec(Math.min(dp(340), H - (underStatusBar ? 0 : statusbar)), MeasureSpec.EXACTLY)
                     );
                 }
             }
@@ -1572,7 +998,7 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
 
             final int T = underStatusBar ? 0 : statusbar;
             int l = insetLeft + (W - insetRight - previewW) / 2,
-                r = insetLeft + (W - insetRight + previewW) / 2, t, b;
+                    r = insetLeft + (W - insetRight + previewW) / 2, t, b;
             if (underStatusBar) {
                 t = T;
                 b = T + previewH + underControls;
@@ -1651,7 +1077,8 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
                     canvas.scale(1f / scale, 1f / scale);
                     canvas.drawBitmap(textureBitmap, 0, 0, new Paint(Paint.FILTER_BITMAP_FLAG));
                     textureBitmap.recycle();
-                } catch (Exception ignore) {}
+                } catch (Exception ignore) {
+                }
                 canvas.restore();
             }
             canvas.save();
@@ -1822,7 +1249,7 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
             if (child == previewContainer) {
                 final float top = underStatusBar ? AndroidUtilities.statusBarHeight : 0;
                 if (topGradient == null) {
-                    topGradient = new LinearGradient(0, top, 0, top + dp(72), new int[] {0x40000000, 0x00000000}, new float[] { top / (top + dp(72)), 1 }, Shader.TileMode.CLAMP );
+                    topGradient = new LinearGradient(0, top, 0, top + dp(72), new int[]{0x40000000, 0x00000000}, new float[]{top / (top + dp(72)), 1}, Shader.TileMode.CLAMP);
                     topGradientPaint.setShader(topGradient);
                 }
                 topGradientPaint.setAlpha(0xFF);
@@ -1906,7 +1333,7 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
     private HintView2 dualHint;
     private HintView2 savedDualHint;
     private HintView2 removeCollageHint;
-//    private StoryPrivacySelector privacySelector;
+    //    private StoryPrivacySelector privacySelector;
 //    private boolean privacySelectorHintOpened;
 //    private StoryPrivacySelector.StoryPrivacyHint privacySelectorHint;
     private PreviewHighlightView previewHighlight;
@@ -1918,7 +1345,7 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
     private ButtonWithCounterView coverButton;
 
     /* EDIT_MODE_PAINT */
-    private PaintView paintView;
+    private ChatAttachCameraPaintView paintView;
     private RenderView paintViewRenderView;
     private View paintViewRenderInputView;
     private View paintViewTextDim;
@@ -1950,10 +1377,6 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
     private int shiftDp = -3;
     private boolean showSavedDraftHint;
 
-    public Context getContext() {
-        return activity;
-    }
-
     @SuppressLint("ClickableViewAccessibility")
     private void initViews() {
         Context context = getContext();
@@ -1967,10 +1390,10 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
                 public WindowInsets onApplyWindowInsets(@NonNull View v, @NonNull WindowInsets insets) {
                     final WindowInsetsCompat insetsCompat = WindowInsetsCompat.toWindowInsetsCompat(insets, v);
                     final androidx.core.graphics.Insets i = insetsCompat.getInsets(WindowInsetsCompat.Type.displayCutout() | WindowInsetsCompat.Type.systemBars());
-                    insetTop    = Math.max(i.top, insets.getStableInsetTop());
+                    insetTop = Math.max(i.top, insets.getStableInsetTop());
                     insetBottom = Math.max(i.bottom, insets.getStableInsetBottom());
-                    insetLeft   = Math.max(i.left, insets.getStableInsetLeft());
-                    insetRight  = Math.max(i.right, insets.getStableInsetRight());
+                    insetLeft = Math.max(i.left, insets.getStableInsetLeft());
+                    insetRight = Math.max(i.right, insets.getStableInsetRight());
                     insetTop = Math.max(insetTop, AndroidUtilities.statusBarHeight);
                     windowView.requestLayout();
                     if (Build.VERSION.SDK_INT >= 30) {
@@ -1983,15 +1406,17 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
         }
         windowView.setFocusable(true);
 
-        flashViews = new FlashViews(context, windowManager, windowView, windowLayoutParams);
+        flashViews = new FlashViews(context, null, null, null);
         flashViews.add(new FlashViews.Invertable() {
             @Override
             public void setInvert(float invert) {
                 AndroidUtilities.setLightNavigationBar(windowView, invert > 0.5f);
                 AndroidUtilities.setLightStatusBar(windowView, invert > 0.5f);
             }
+
             @Override
-            public void invalidate() {}
+            public void invalidate() {
+            }
         });
         windowView.addView(flashViews.backgroundView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         windowView.addView(containerView = new ContainerView(context));
@@ -2041,6 +1466,7 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
             }
 
             private RenderNode renderNode;
+
             @Override
             protected void dispatchDraw(@NonNull Canvas c) {
                 boolean endRecording = false;
@@ -2224,13 +1650,15 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
                     if (outputEntry.round != null) {
                         try {
                             outputEntry.round.delete();
-                        } catch (Exception ignore) {}
+                        } catch (Exception ignore) {
+                        }
                         outputEntry.round = null;
                     }
                     if (outputEntry.roundThumb != null) {
                         try {
                             new File(outputEntry.roundThumb).delete();
-                        } catch (Exception ignore) {}
+                        } catch (Exception ignore) {
+                        }
                         outputEntry.roundThumb = null;
                     }
                 }
@@ -2423,13 +1851,15 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
                     if (outputEntry.round != null) {
                         try {
                             outputEntry.round.delete();
-                        } catch (Exception ignore) {}
+                        } catch (Exception ignore) {
+                        }
                         outputEntry.round = null;
                     }
                     if (outputEntry.roundThumb != null) {
                         try {
                             new File(outputEntry.roundThumb).delete();
-                        } catch (Exception ignore) {}
+                        } catch (Exception ignore) {
+                        }
                         outputEntry.roundThumb = null;
                     }
                 }
@@ -2461,6 +1891,7 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
             }
 
             private final Path path = new Path();
+
             @Override
             protected void drawBlur(BlurringShader.StoryBlurDrawer blur, Canvas canvas, RectF rect, float r, boolean text, float ox, float oy, boolean thisView, float alpha) {
                 if (!canvas.isHardwareAccelerated()) {
@@ -2591,10 +2022,10 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
         }, currentAccount, windowView, resourcesProvider);
 
         muteHint = new HintView2(activity, HintView2.DIRECTION_TOP)
-            .setJoint(1, -77 + 8 - 2)
-            .setDuration(2000)
-            .setBounce(false)
-            .setAnimatedTextHacks(true, true, false);
+                .setJoint(1, -77 + 8 - 2)
+                .setDuration(2000)
+                .setBounce(false)
+                .setAnimatedTextHacks(true, true, false);
         muteHint.setPadding(dp(8), 0, dp(8), 0);
         actionBarContainer.addView(muteHint, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.TOP, 0, 52, 0, 0));
 
@@ -2617,10 +2048,10 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
             final boolean hasRound = outputEntry.round != null;
             if (currentEditMode == EDIT_MODE_NONE) {
                 muteHint.setText(
-                    outputEntry.muted ?
-                        getString(hasMusic || hasRound ? R.string.StoryOriginalSoundMuted : R.string.StorySoundMuted) :
-                        getString(hasMusic || hasRound ? R.string.StoryOriginalSoundNotMuted : R.string.StorySoundNotMuted),
-                    muteHint.shown()
+                        outputEntry.muted ?
+                                getString(hasMusic || hasRound ? R.string.StoryOriginalSoundMuted : R.string.StorySoundMuted) :
+                                getString(hasMusic || hasRound ? R.string.StoryOriginalSoundNotMuted : R.string.StorySoundNotMuted),
+                        muteHint.shown()
                 );
                 muteHint.show();
             }
@@ -2667,32 +2098,32 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
             flashButton.setSelected(true);
             flashViews.previewStart();
             ItemOptions.makeOptions(containerView, resourcesProvider, flashButton)
-                .addView(
-                    new SliderView(getContext(), SliderView.TYPE_WARMTH)
-                        .setValue(flashViews.warmth)
-                        .setOnValueChange(v -> {
-                            flashViews.setWarmth(v);
-                        })
-                )
-                .addSpaceGap()
-                .addView(
-                    new SliderView(getContext(), SliderView.TYPE_INTENSITY)
-                        .setMinMax(.65f, 1f)
-                        .setValue(flashViews.intensity)
-                        .setOnValueChange(v -> {
-                            flashViews.setIntensity(v);
-                        })
-                )
-                .setOnDismiss(() -> {
-                    saveFrontFaceFlashMode();
-                    flashViews.previewEnd();
-                    flashButton.setSelected(false);
-                })
-                .setDimAlpha(0)
-                .setGravity(Gravity.RIGHT)
-                .translate(dp(46), -dp(4))
-                .setBackgroundColor(0xbb1b1b1b)
-                .show();
+                    .addView(
+                            new SliderView(getContext(), SliderView.TYPE_WARMTH)
+                                    .setValue(flashViews.warmth)
+                                    .setOnValueChange(v -> {
+                                        flashViews.setWarmth(v);
+                                    })
+                    )
+                    .addSpaceGap()
+                    .addView(
+                            new SliderView(getContext(), SliderView.TYPE_INTENSITY)
+                                    .setMinMax(.65f, 1f)
+                                    .setValue(flashViews.intensity)
+                                    .setOnValueChange(v -> {
+                                        flashViews.setIntensity(v);
+                                    })
+                    )
+                    .setOnDismiss(() -> {
+                        saveFrontFaceFlashMode();
+                        flashViews.previewEnd();
+                        flashButton.setSelected(false);
+                    })
+                    .setDimAlpha(0)
+                    .setGravity(Gravity.RIGHT)
+                    .translate(dp(46), -dp(4))
+                    .setBackgroundColor(0xbb1b1b1b)
+                    .show();
             return true;
         });
         flashButton.setVisibility(View.GONE);
@@ -2784,11 +2215,11 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
         actionBarContainer.addView(collageListView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 56, Gravity.TOP | Gravity.RIGHT));
 
         dualHint = new HintView2(activity, HintView2.DIRECTION_TOP)
-            .setJoint(1, -20)
-            .setDuration(5000)
-            .setCloseButton(true)
-            .setText(getString(R.string.StoryCameraDualHint))
-            .setOnHiddenListener(() -> MessagesController.getGlobalMainSettings().edit().putInt("storydualhint", MessagesController.getGlobalMainSettings().getInt("storydualhint", 0) + 1).apply());
+                .setJoint(1, -20)
+                .setDuration(5000)
+                .setCloseButton(true)
+                .setText(getString(R.string.StoryCameraDualHint))
+                .setOnHiddenListener(() -> MessagesController.getGlobalMainSettings().edit().putInt("storydualhint", MessagesController.getGlobalMainSettings().getInt("storydualhint", 0) + 1).apply());
         dualHint.setPadding(dp(8), 0, dp(8), 0);
         actionBarContainer.addView(dualHint, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.TOP, 0, 52, 0, 0));
 
@@ -2959,7 +2390,8 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
         if (captionEdit != null && captionEdit.isCaptionOverLimit()) {
             BotWebViewVibrationEffect.APP_ERROR.vibrate();
             AndroidUtilities.shakeViewSpring(captionEdit.limitTextView, shiftDp = -shiftDp);
-            captionEdit.captionLimitToast();
+            // TODO
+//            captionEdit.captionLimitToast();
             return;
         }
         if (outputEntry == null || !outputEntry.isEdit && outputEntry.botId == 0) {
@@ -3078,7 +2510,8 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
                         if (user != null && !UserObject.isUserSelf(user) && UserObject.getPublicUsername(user) != null && !users.contains(user)) {
                             users.add(UserObject.getPublicUsername(user));
                         }
-                    } catch (Exception ignore) {}
+                    } catch (Exception ignore) {
+                    }
                 }
             }
         }
@@ -3119,6 +2552,7 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
     }
 
     private boolean preparingUpload = false;
+
     private void upload(boolean asStory) {
         if (preparingUpload) {
             return;
@@ -3138,9 +2572,9 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
         }
         destroyPhotoFilterView();
         prepareThumb(outputEntry, false);
-        CharSequence[] caption = new CharSequence[] { captionEdit.getText() };
+        CharSequence[] caption = new CharSequence[]{captionEdit.getText()};
         ArrayList<TLRPC.MessageEntity> captionEntities = MessagesController.getInstance(currentAccount).storyEntitiesAllowed() ? MediaDataController.getInstance(currentAccount).getEntities(caption, true) : new ArrayList<>();
-        CharSequence[] pastCaption = new CharSequence[] { outputEntry.caption };
+        CharSequence[] pastCaption = new CharSequence[]{outputEntry.caption};
         ArrayList<TLRPC.MessageEntity> pastEntities = MessagesController.getInstance(currentAccount).storyEntitiesAllowed() ? MediaDataController.getInstance(currentAccount).getEntities(pastCaption, true) : new ArrayList<>();
         outputEntry.editedCaption = !TextUtils.equals(outputEntry.caption, caption[0]) || !MediaDataController.entitiesEqual(captionEntities, pastEntities);
         outputEntry.caption = new SpannableString(captionEdit.getText());
@@ -3164,26 +2598,9 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
         long finalSendAsDialogId = sendAsDialogId;
         Runnable runnable = () -> {
             if (asStory) {
-                if (fromSourceView != null) {
-                    fromSourceView.show(true);
-                    fromSourceView = null;
-                }
                 if (closeListener != null) {
                     closeListener.run();
                     closeListener = null;
-                }
-                fromSourceView = closingSourceProvider != null ? closingSourceProvider.getView(finalSendAsDialogId) : null;
-                if (fromSourceView != null) {
-                    openType = fromSourceView.type;
-                    containerView.updateBackground();
-                    previewContainer.setBackgroundColor(openType == 1 || openType == 0 ? 0 : 0xff1f1f1f);
-                    fromRect.set(fromSourceView.screenRect);
-                    fromRounding = fromSourceView.rounding;
-                    fromSourceView.hide();
-
-                    if (waveEffect == null && SharedConfig.getDevicePerformanceClass() > SharedConfig.PERFORMANCE_CLASS_AVERAGE && LiteMode.isEnabled(LiteMode.FLAGS_CHAT) && false) {
-                        waveEffect = new StoryWaveEffectView(getContext(), fromSourceView.screenRect.centerX(), fromSourceView.screenRect.centerY(), fromSourceView.screenRect.width() / 2f);
-                    }
                 }
                 closingSourceProvider = null;
 
@@ -3310,6 +2727,7 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
     }
 
     private String flashButtonMode;
+
     private void setCameraFlashModeIcon(String mode, boolean animated) {
         flashButton.clearAnimation();
         if (cameraView != null && cameraView.isDual() || animatedRecording) {
@@ -3355,7 +2773,8 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
             if (outputFile != null) {
                 try {
                     outputFile.delete();
-                } catch (Exception ignore) {}
+                } catch (Exception ignore) {
+                }
                 outputFile = null;
             }
             outputFile = StoryEntry.makeCacheFile(currentAccount, false);
@@ -3411,7 +2830,8 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
                     if (useDisplayFlashlight()) {
                         try {
                             windowView.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING);
-                        } catch (Exception ignore) {}
+                        } catch (Exception ignore) {
+                        }
                     }
                     takingPhoto = false;
                     if (outputFile == null) {
@@ -3424,7 +2844,8 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
                         BitmapFactory.decodeFile(outputFile.getAbsolutePath(), opts);
                         w = opts.outWidth;
                         h = opts.outHeight;
-                    } catch (Exception ignore) {}
+                    } catch (Exception ignore) {
+                    }
 
                     int rotate = orientation == -1 ? 0 : 90;
                     if (orientation == -1) {
@@ -3523,7 +2944,8 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
             if (outputFile != null) {
                 try {
                     outputFile.delete();
-                } catch (Exception ignore) {}
+                } catch (Exception ignore) {
+                }
                 outputFile = null;
             }
             outputFile = StoryEntry.makeCacheFile(currentAccount, true);
@@ -3721,21 +3143,23 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
     };
 
     private void setAwakeLock(boolean lock) {
-        if (lock) {
-            windowLayoutParams.flags |= WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON;
-        } else {
-            windowLayoutParams.flags &= ~WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON;
-        }
-        try {
-            windowManager.updateViewLayout(windowView, windowLayoutParams);
-        } catch (Exception e) {
-            FileLog.e(e);
-        }
+        // TODO
+//        if (lock) {
+//            windowLayoutParams.flags |= WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON;
+//        } else {
+//            windowLayoutParams.flags &= ~WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON;
+//        }
+//        try {
+//            windowManager.updateViewLayout(windowView, windowLayoutParams);
+//        } catch (Exception e) {
+//            FileLog.e(e);
+//        }
     }
 
     private AnimatorSet recordingAnimator;
     private boolean animatedRecording;
     private boolean animatedRecordingWasInCheck;
+
     private void animateRecording(boolean recording, boolean animated) {
         if (recording) {
             if (dualHint != null) {
@@ -3767,12 +3191,12 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
         if (animated) {
             recordingAnimator = new AnimatorSet();
             recordingAnimator.playTogether(
-                ObjectAnimator.ofFloat(hintTextView, View.ALPHA, recording && currentPage == PAGE_CAMERA && !inCheck() ? 1 : 0),
-                ObjectAnimator.ofFloat(hintTextView, View.TRANSLATION_Y, recording && currentPage == PAGE_CAMERA && !inCheck() ? 0 : dp(16)),
-                ObjectAnimator.ofFloat(collageHintTextView, View.ALPHA, !recording && currentPage == PAGE_CAMERA && inCheck() ? 0.6f : 0),
-                ObjectAnimator.ofFloat(collageHintTextView, View.TRANSLATION_Y, !recording && currentPage == PAGE_CAMERA && inCheck() ? 0 : dp(16)),
-                ObjectAnimator.ofFloat(modeSwitcherView, View.ALPHA, recording || currentPage != PAGE_CAMERA || inCheck() ? 0 : 1),
-                ObjectAnimator.ofFloat(modeSwitcherView, View.TRANSLATION_Y, recording || currentPage != PAGE_CAMERA || inCheck() ? dp(16) : 0)
+                    ObjectAnimator.ofFloat(hintTextView, View.ALPHA, recording && currentPage == PAGE_CAMERA && !inCheck() ? 1 : 0),
+                    ObjectAnimator.ofFloat(hintTextView, View.TRANSLATION_Y, recording && currentPage == PAGE_CAMERA && !inCheck() ? 0 : dp(16)),
+                    ObjectAnimator.ofFloat(collageHintTextView, View.ALPHA, !recording && currentPage == PAGE_CAMERA && inCheck() ? 0.6f : 0),
+                    ObjectAnimator.ofFloat(collageHintTextView, View.TRANSLATION_Y, !recording && currentPage == PAGE_CAMERA && inCheck() ? 0 : dp(16)),
+                    ObjectAnimator.ofFloat(modeSwitcherView, View.ALPHA, recording || currentPage != PAGE_CAMERA || inCheck() ? 0 : 1),
+                    ObjectAnimator.ofFloat(modeSwitcherView, View.TRANSLATION_Y, recording || currentPage != PAGE_CAMERA || inCheck() ? dp(16) : 0)
             );
             recordingAnimator.setDuration(260);
             recordingAnimator.setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT);
@@ -3788,6 +3212,7 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
     }
 
     private boolean isDark;
+
     private void checkIsDark() {
         if (cameraView == null || cameraView.getTextureView() == null) {
             isDark = false;
@@ -3816,6 +3241,7 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
     }
 
     private boolean videoTimerShown = true;
+
     private void showVideoTimer(boolean show, boolean animated) {
         if (videoTimerShown == show) {
             return;
@@ -3972,9 +3398,11 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
 
     private Runnable afterPlayerAwait;
     private boolean previewAlreadySet;
+
     public void navigateToPreviewWithPlayerAwait(Runnable open, long seekTo) {
         navigateToPreviewWithPlayerAwait(open, seekTo, 800);
     }
+
     public void navigateToPreviewWithPlayerAwait(Runnable open, long seekTo, long ms) {
         if (awaitingPlayer || outputEntry == null) {
             return;
@@ -3999,6 +3427,7 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
     }
 
     private AnimatorSet pageAnimator;
+
     public void navigateTo(int page, boolean animated) {
         if (page == currentPage) {
             return;
@@ -4110,6 +3539,7 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
 
     private ValueAnimator containerViewBackAnimator;
     private boolean applyContainerViewTranslation2 = true;
+
     private void animateContainerBack() {
         if (containerViewBackAnimator != null) {
             containerViewBackAnimator.cancel();
@@ -4616,12 +4046,13 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
                         outputEntry.editedMedia = true;
                     }
                 };
-                coverTimelineView.setDelegate(new TimelineView.TimelineDelegate() {
-                    @Override
-                    public void onVideoLeftChange(float left) {
-                        videoLeftSet.run(false, left);
-                    }
-                });
+                // TODO
+//                coverTimelineView.setDelegate(new TimelineView.TimelineDelegate() {
+//                    @Override
+//                    public void onVideoLeftChange(float left) {
+//                        videoLeftSet.run(false, left);
+//                    }
+//                });
                 float left = (float) coverValue / Math.max(1, duration) * (1f - 0.04f);
                 coverTimelineView.setVideoLeft(left);
                 coverTimelineView.setVideoRight(left + 0.04f);
@@ -4741,9 +4172,11 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
     }
 
     private AnimatorSet editModeAnimator;
+
     public void switchToEditMode(int editMode, boolean animated) {
         switchToEditMode(editMode, false, animated);
     }
+
     public void switchToEditMode(int editMode, boolean force, boolean animated) {
         if (currentEditMode == editMode && !force) {
             return;
@@ -4945,28 +4378,28 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
         }
 
         int w = previewContainer.getMeasuredWidth(), h = previewContainer.getMeasuredHeight();
-        paintView = new PaintView(
-            activity,
-            outputEntry != null && !outputEntry.fileDeletable,
-            outputEntry == null ? null : outputEntry.file,
-            outputEntry != null && outputEntry.isVideo,
-            outputEntry != null && outputEntry.botId != 0,
-            windowView,
-            activity,
-            currentAccount,
-            paintViewBitmap,
-            paintViewBlurBitmap,
-            null,
-            previewView.getOrientation(),
-            outputEntry == null ? null : outputEntry.mediaEntities,
-            outputEntry,
-            w, h,
-            new MediaController.CropState(),
-            null,
-            blurManager,
-            resourcesProvider,
-            videoTextureHolder,
-            previewView
+        paintView = new ChatAttachCameraPaintView(
+                activity,
+                outputEntry != null && !outputEntry.fileDeletable,
+                outputEntry == null ? null : outputEntry.file,
+                outputEntry != null && outputEntry.isVideo,
+                outputEntry != null && outputEntry.botId != 0,
+                windowView,
+                activity,
+                currentAccount,
+                paintViewBitmap,
+                paintViewBlurBitmap,
+                null,
+                previewView.getOrientation(),
+                outputEntry == null ? null : outputEntry.mediaEntities,
+                outputEntry,
+                w, h,
+                new MediaController.CropState(),
+                null,
+                blurManager,
+                resourcesProvider,
+                videoTextureHolder,
+                previewView
         ) {
             @Override
             public void onEntityDraggedTop(boolean value) {
@@ -5151,13 +4584,15 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
                     if (outputEntry.round != null) {
                         try {
                             outputEntry.round.delete();
-                        } catch (Exception ignore) {}
+                        } catch (Exception ignore) {
+                        }
                         outputEntry.round = null;
                     }
                     if (outputEntry.roundThumb != null) {
                         try {
                             new File(outputEntry.roundThumb).delete();
-                        } catch (Exception ignore) {}
+                        } catch (Exception ignore) {
+                        }
                         outputEntry.roundThumb = null;
                     }
                 }
@@ -5205,7 +4640,8 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
                 matrix.postTranslate(containerView.getX() + previewContainer.getX() + photoView.getX() + tx, containerView.getY() + previewContainer.getY() + photoView.getY() + ty);
                 thanosEffect.animate(matrix, bitmap, () -> {
                     photoView.onSwitchSegmentedAnimationStarted(true);
-                }, () -> {});
+                }, () -> {
+                });
             }
 
             @Override
@@ -5401,8 +4837,9 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
             photoFilterEnhanceView.setAllowTouch(toMode == EDIT_MODE_FILTER || toMode == EDIT_MODE_NONE);
         }
     }
+
     private void applyPaintInBackground(Runnable whenDone) {
-        final PaintView paintView = this.paintView;
+        final ChatAttachCameraPaintView paintView = this.paintView;
         final StoryEntry outputEntry = this.outputEntry;
         if (paintView == null || outputEntry == null) {
             whenDone.run();
@@ -5543,17 +4980,20 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
                     if (outputEntry.paintFile != null) {
                         outputEntry.paintFile.delete();
                     }
-                } catch (Exception ignore) {}
+                } catch (Exception ignore) {
+                }
                 try {
                     if (outputEntry.paintEntitiesFile != null) {
                         outputEntry.paintEntitiesFile.delete();
                     }
-                } catch (Exception ignore) {}
+                } catch (Exception ignore) {
+                }
                 try {
                     if (outputEntry.paintBlurFile != null) {
                         outputEntry.paintBlurFile.delete();
                     }
-                } catch (Exception ignore) {}
+                } catch (Exception ignore) {
+                }
                 outputEntry.paintFile = null;
                 outputEntry.paintEntitiesFile = null;
                 outputEntry.paintBlurFile = null;
@@ -5622,17 +5062,20 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
             if (outputEntry.paintFile != null) {
                 outputEntry.paintFile.delete();
             }
-        } catch (Exception ignore) {}
+        } catch (Exception ignore) {
+        }
         try {
             if (outputEntry.paintEntitiesFile != null) {
                 outputEntry.paintEntitiesFile.delete();
             }
-        } catch (Exception ignore) {}
+        } catch (Exception ignore) {
+        }
         try {
             if (outputEntry.paintBlurFile != null) {
                 outputEntry.paintBlurFile.delete();
             }
-        } catch (Exception ignore) {}
+        } catch (Exception ignore) {
+        }
         outputEntry.paintFile = null;
         outputEntry.paintEntitiesFile = null;
         outputEntry.paintBlurFile = null;
@@ -5706,10 +5149,10 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
                             Path path = new Path();
                             canvas.scale(1f / S, 1f / S);
                             AndroidUtilities.rectTmp.set(
-                                w * S / 2f - photoImage.getImageWidth() / 2f,
-                                h * S / 2f - photoImage.getImageHeight() / 2f,
-                                w * S / 2f + photoImage.getImageWidth() / 2f,
-                                h * S / 2f + photoImage.getImageHeight() / 2f
+                                    w * S / 2f - photoImage.getImageWidth() / 2f,
+                                    h * S / 2f - photoImage.getImageHeight() / 2f,
+                                    w * S / 2f + photoImage.getImageWidth() / 2f,
+                                    h * S / 2f + photoImage.getImageHeight() / 2f
                             );
                             path.addRoundRect(AndroidUtilities.rectTmp, radii, Path.Direction.CW);
                             Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -5977,7 +5420,7 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
         cameraView.recordHevc = !collageLayoutView.hasLayout();
         cameraView.setThumbDrawable(getCameraThumb());
         cameraView.initTexture();
-        cameraView.setDelegate(() -> {
+        cameraView.addDelegate(() -> {
             String currentFlashMode = getCurrentFlashMode();
             if (TextUtils.equals(currentFlashMode, getNextFlashMode())) {
                 currentFlashMode = null;
@@ -6002,6 +5445,7 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
 
     private int frontfaceFlashMode = -1;
     private ArrayList<String> frontfaceFlashModes;
+
     private void checkFrontfaceFlashModes() {
         if (frontfaceFlashMode < 0) {
             frontfaceFlashMode = MessagesController.getGlobalMainSettings().getInt("frontflash", 1);
@@ -6014,12 +5458,13 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
             flashViews.setIntensity(MessagesController.getGlobalMainSettings().getFloat("frontflash_intensity", 1));
         }
     }
+
     private void saveFrontFaceFlashMode() {
         if (frontfaceFlashMode >= 0) {
             MessagesController.getGlobalMainSettings().edit()
-                .putFloat("frontflash_warmth", flashViews.warmth)
-                .putFloat("frontflash_intensity", flashViews.intensity)
-                .apply();
+                    .putFloat("frontflash_warmth", flashViews.warmth)
+                    .putFloat("frontflash_intensity", flashViews.intensity)
+                    .apply();
         }
     }
 
@@ -6066,7 +5511,8 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
         try {
             File file = new File(ApplicationLoader.getFilesDirFixed(), "cthumb.jpg");
             bitmap = BitmapFactory.decodeFile(file.getAbsolutePath());
-        } catch (Throwable ignore) {}
+        } catch (Throwable ignore) {
+        }
         if (bitmap != null) {
             return new BitmapDrawable(bitmap);
         } else {
@@ -6106,7 +5552,8 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
                     AndroidUtilities.runOnUIThread(whenDone);
                 }
             });
-        } catch (Throwable ignore) {}
+        } catch (Throwable ignore) {
+        }
     }
 
     private void showDismissEntry() {
@@ -6187,11 +5634,9 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
         }
     }
 
-    public interface Touchable {
-        boolean onTouch(MotionEvent event);
-    }
 
-    private Touchable previewTouchable;
+
+    private PhotoFilterTouchable previewTouchable;
     private boolean requestedCameraPermission;
 
     private void requestCameraPermission(boolean force) {
@@ -6210,20 +5655,20 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
                 cameraViewThumb.setImageDrawable(drawable);
                 if (activity.shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)) {
                     new AlertDialog.Builder(getContext(), resourcesProvider)
-                        .setTopAnimation(R.raw.permission_request_camera, AlertsCreator.PERMISSIONS_REQUEST_TOP_ICON_SIZE, false, Theme.getColor(Theme.key_dialogTopBackground))
-                        .setMessage(AndroidUtilities.replaceTags(getString(R.string.PermissionNoCameraWithHint)))
-                        .setPositiveButton(getString(R.string.PermissionOpenSettings), (dialogInterface, i) -> {
-                            try {
-                                Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                                intent.setData(Uri.parse("package:" + ApplicationLoader.applicationContext.getPackageName()));
-                                activity.startActivity(intent);
-                            } catch (Exception e) {
-                                FileLog.e(e);
-                            }
-                        })
-                        .setNegativeButton(getString(R.string.ContactsPermissionAlertNotNow), null)
-                        .create()
-                        .show();
+                            .setTopAnimation(R.raw.permission_request_camera, AlertsCreator.PERMISSIONS_REQUEST_TOP_ICON_SIZE, false, Theme.getColor(Theme.key_dialogTopBackground))
+                            .setMessage(AndroidUtilities.replaceTags(getString(R.string.PermissionNoCameraWithHint)))
+                            .setPositiveButton(getString(R.string.PermissionOpenSettings), (dialogInterface, i) -> {
+                                try {
+                                    Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                                    intent.setData(Uri.parse("package:" + ApplicationLoader.applicationContext.getPackageName()));
+                                    activity.startActivity(intent);
+                                } catch (Exception e) {
+                                    FileLog.e(e);
+                                }
+                            })
+                            .setNegativeButton(getString(R.string.ContactsPermissionAlertNotNow), null)
+                            .create()
+                            .show();
                     return;
                 }
                 activity.requestPermissions(new String[]{Manifest.permission.CAMERA}, 111);
@@ -6245,8 +5690,8 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
             boolean noGalleryPermission = false;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 noGalleryPermission = (
-                    activity.checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED ||
-                    activity.checkSelfPermission(Manifest.permission.READ_MEDIA_VIDEO) != PackageManager.PERMISSION_GRANTED
+                        activity.checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED ||
+                                activity.checkSelfPermission(Manifest.permission.READ_MEDIA_VIDEO) != PackageManager.PERMISSION_GRANTED
                 );
                 if (noGalleryPermission) {
                     activity.requestPermissions(new String[]{Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO}, 114);
@@ -6273,13 +5718,8 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
         return true;
     }
 
-    public static void onResume() {
-        if (instance != null) {
-            instance.onResumeInternal();
-        }
-    }
-
     private Runnable whenOpenDone;
+
     private void onResumeInternal() {
         if (currentPage == PAGE_CAMERA) {
 //            requestedCameraPermission = false;
@@ -6308,11 +5748,6 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
         MessagesController.getInstance(currentAccount).getStoriesController().getDraftsController().load();
     }
 
-    public static void onPause() {
-        if (instance != null) {
-            instance.onPauseInternal();
-        }
-    }
     private void onPauseInternal() {
         destroyCameraView(false);
         if (captionEdit != null) {
@@ -6323,88 +5758,7 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
         }
     }
 
-    public static void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        if (instance != null) {
-            instance.onRequestPermissionsResultInternal(requestCode, permissions, grantResults);
-        }
-    }
-
     private Runnable audioGrantedCallback;
-    private void onRequestPermissionsResultInternal(int requestCode, String[] permissions, int[] grantResults) {
-        final boolean granted = grantResults != null && grantResults.length == 1 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
-        if (requestCode == 111) {
-            noCameraPermission = !granted;
-            if (granted && currentPage == PAGE_CAMERA) {
-                cameraViewThumb.setImageDrawable(null);
-                if (CameraController.getInstance().isCameraInitied()) {
-                    createCameraView();
-                } else {
-                    CameraController.getInstance().initCamera(this::createCameraView);
-                }
-            }
-        } else if (requestCode == 114) {
-            if (granted) {
-                MediaController.loadGalleryPhotosAlbums(0);
-                animateGalleryListView(true);
-            } else {
-                new AlertDialog.Builder(getContext(), resourcesProvider)
-                    .setTopAnimation(R.raw.permission_request_folder, AlertsCreator.PERMISSIONS_REQUEST_TOP_ICON_SIZE, false, Theme.getColor(Theme.key_dialogTopBackground))
-                    .setMessage(AndroidUtilities.replaceTags(getString(R.string.PermissionStorageWithHint)))
-                    .setPositiveButton(getString(R.string.PermissionOpenSettings), (dialogInterface, i) -> {
-                        try {
-                            Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                            intent.setData(Uri.parse("package:" + ApplicationLoader.applicationContext.getPackageName()));
-                            activity.startActivity(intent);
-                        } catch (Exception e) {
-                            FileLog.e(e);
-                        }
-                    })
-                    .setNegativeButton(getString(R.string.ContactsPermissionAlertNotNow), null)
-                    .create()
-                    .show();
-            }
-        } else if (requestCode == 112) {
-            if (!granted) {
-                new AlertDialog.Builder(getContext(), resourcesProvider)
-                    .setTopAnimation(R.raw.permission_request_camera, AlertsCreator.PERMISSIONS_REQUEST_TOP_ICON_SIZE, false, Theme.getColor(Theme.key_dialogTopBackground))
-                    .setMessage(AndroidUtilities.replaceTags(getString(R.string.PermissionNoCameraMicVideo)))
-                    .setPositiveButton(getString(R.string.PermissionOpenSettings), (dialogInterface, i) -> {
-                        try {
-                            Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                            intent.setData(Uri.parse("package:" + ApplicationLoader.applicationContext.getPackageName()));
-                            activity.startActivity(intent);
-                        } catch (Exception e) {
-                            FileLog.e(e);
-                        }
-                    })
-                    .setNegativeButton(getString(R.string.ContactsPermissionAlertNotNow), null)
-                    .create()
-                    .show();
-            }
-        } else if (requestCode == 115) {
-            if (!granted) {
-                new AlertDialog.Builder(getContext(), resourcesProvider)
-                    .setTopAnimation(R.raw.permission_request_folder, AlertsCreator.PERMISSIONS_REQUEST_TOP_ICON_SIZE, false, Theme.getColor(Theme.key_dialogTopBackground))
-                    .setMessage(AndroidUtilities.replaceTags(getString(R.string.PermissionNoAudioStorageStory)))
-                    .setPositiveButton(getString(R.string.PermissionOpenSettings), (dialogInterface, i) -> {
-                        try {
-                            Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                            intent.setData(Uri.parse("package:" + ApplicationLoader.applicationContext.getPackageName()));
-                            activity.startActivity(intent);
-                        } catch (Exception e) {
-                            FileLog.e(e);
-                        }
-                    })
-                    .setNegativeButton(getString(R.string.ContactsPermissionAlertNotNow), null)
-                    .create()
-                    .show();
-            }
-            if (granted && audioGrantedCallback != null) {
-                audioGrantedCallback.run();
-            }
-            audioGrantedCallback = null;
-        }
-    }
 
     private void saveCameraFace(boolean frontface) {
         MessagesController.getGlobalMainSettings().edit().putBoolean("stories_camera", frontface).apply();
@@ -6458,6 +5812,7 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
     }
 
     private boolean shownLimitReached;
+
     private void showLimitReachedSheet(StoriesController.StoryLimit storyLimit, boolean closeRecorder) {
         if (shownLimitReached) {
             return;
@@ -6504,6 +5859,7 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
 
     private boolean isBackgroundVisible;
     private boolean forceBackgroundVisible;
+
     private void checkBackgroundVisibility() {
         boolean shouldBeVisible = dismissProgress != 0 || openProgress < 1 || forceBackgroundVisible;
         if (shouldBeVisible == isBackgroundVisible) {
@@ -6518,7 +5874,6 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
 
     public interface ClosingViewProvider {
         void preLayout(long dialogId, Runnable runnable);
-        SourceView getView(long dialogId);
     }
 
     private void openPremium() {
@@ -6529,15 +5884,19 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
             captionEdit.hidePeriodPopup();
         }
         PremiumFeatureBottomSheet sheet = new PremiumFeatureBottomSheet(new BaseFragment() {
-            { currentAccount = ChatAttachCameraRecorder.this.currentAccount; }
+            {
+                currentAccount = ChatAttachCameraRecorderView.this.currentAccount;
+            }
+
             @Override
             public Dialog showDialog(Dialog dialog) {
                 dialog.show();
                 return dialog;
             }
+
             @Override
             public Activity getParentActivity() {
-                return ChatAttachCameraRecorder.this.activity;
+                return ChatAttachCameraRecorderView.this.activity;
             }
 
             @Override
@@ -6591,8 +5950,8 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
         }
         window.setTouchable(true);
         BulletinFactory.of(window, resourcesProvider)
-            .createSimpleBulletin(R.raw.fire_on, premiumText(LocaleController.formatPluralString("StoryPeriodPremium", hours)), 3)
-            .show(true);
+                .createSimpleBulletin(R.raw.fire_on, premiumText(LocaleController.formatPluralString("StoryPeriodPremium", hours)), 3)
+                .show(true);
     }
 
     public void setIconMuted(boolean muted, boolean animated) {
@@ -6620,7 +5979,7 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
         }
     }
 
-    public ChatAttachCameraRecorder selectedPeerId(long dialogId) {
+    public ChatAttachCameraRecorderView selectedPeerId(long dialogId) {
         this.selectedDialogId = dialogId;
         if (captionEdit != null) {
             captionEdit.setDialogId(dialogId);
@@ -6628,7 +5987,7 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
         return this;
     }
 
-    public ChatAttachCameraRecorder canChangePeer(boolean b) {
+    public ChatAttachCameraRecorderView canChangePeer(boolean b) {
         canChangePeer = b;
         return this;
     }
@@ -6852,25 +6211,25 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
         if (animated) {
             view.setVisibility(View.VISIBLE);
             view.animate()
-                .alpha(visible ? 1.0f : 0.0f)
-                .setUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-                    @Override
-                    public void onAnimationUpdate(@NonNull ValueAnimator animation) {
-                        updateActionBarButtonsOffsets();
-                    }
-                })
-                .setListener(new AnimatorListenerAdapter() {
-                    @Override
-                    public void onAnimationEnd(Animator animation) {
-                        updateActionBarButtonsOffsets();
-                        if (!visible) {
-                            view.setVisibility(View.GONE);
+                    .alpha(visible ? 1.0f : 0.0f)
+                    .setUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                        @Override
+                        public void onAnimationUpdate(@NonNull ValueAnimator animation) {
+                            updateActionBarButtonsOffsets();
                         }
-                    }
-                })
-                .setDuration(320)
-                .setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT)
-                .start();
+                    })
+                    .setListener(new AnimatorListenerAdapter() {
+                        @Override
+                        public void onAnimationEnd(Animator animation) {
+                            updateActionBarButtonsOffsets();
+                            if (!visible) {
+                                view.setVisibility(View.GONE);
+                            }
+                        }
+                    })
+                    .setDuration(320)
+                    .setInterpolator(CubicBezierInterpolator.EASE_OUT_QUINT)
+                    .start();
         } else {
             view.animate().cancel();
             view.setVisibility(visible ? View.VISIBLE : View.GONE);
@@ -6900,13 +6259,18 @@ public class ChatAttachCameraRecorder implements NotificationCenter.Notification
 
     private void updateActionBarButtonsOffsets() {
         float right = 0;
-        collageRemoveButton.setTranslationX(-right); right += dp(46) * collageRemoveButton.getAlpha();
-        dualButton.setTranslationX(-right);          right += dp(46) * dualButton.getAlpha();
-        collageButton.setTranslationX(-right);       right += dp(46) * collageButton.getAlpha();
-        flashButton.setTranslationX(-right);         right += dp(46) * flashButton.getAlpha();
+        collageRemoveButton.setTranslationX(-right);
+        right += dp(46) * collageRemoveButton.getAlpha();
+        dualButton.setTranslationX(-right);
+        right += dp(46) * dualButton.getAlpha();
+        collageButton.setTranslationX(-right);
+        right += dp(46) * collageButton.getAlpha();
+        flashButton.setTranslationX(-right);
+        right += dp(46) * flashButton.getAlpha();
 
         float left = 0;
-        backButton.setTranslationX(left); left += dp(46) * backButton.getAlpha();
+        backButton.setTranslationX(left);
+        left += dp(46) * backButton.getAlpha();
 
         collageListView.setBounds(left + dp(8), right + dp(8));
     }

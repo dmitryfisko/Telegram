@@ -135,6 +135,7 @@ import org.telegram.ui.Components.Paint.Views.PhotoView;
 import org.telegram.ui.Components.Paint.Views.RoundView;
 import org.telegram.ui.Components.PhotoFilterBlurControl;
 import org.telegram.ui.Components.PhotoFilterCurvesControl;
+import org.telegram.ui.Components.PhotoFilterTouchable;
 import org.telegram.ui.Components.PhotoFilterView;
 import org.telegram.ui.Components.Premium.LimitReachedBottomSheet;
 import org.telegram.ui.Components.Premium.PremiumFeatureBottomSheet;
@@ -5947,7 +5948,7 @@ public class StoryRecorder implements NotificationCenter.NotificationCenterDeleg
         cameraView.recordHevc = !collageLayoutView.hasLayout();
         cameraView.setThumbDrawable(getCameraThumb());
         cameraView.initTexture();
-        cameraView.setDelegate(() -> {
+        cameraView.addDelegate(() -> {
             String currentFlashMode = getCurrentFlashMode();
             if (TextUtils.equals(currentFlashMode, getNextFlashMode())) {
                 currentFlashMode = null;
@@ -6157,11 +6158,7 @@ public class StoryRecorder implements NotificationCenter.NotificationCenterDeleg
         }
     }
 
-    public interface Touchable {
-        boolean onTouch(MotionEvent event);
-    }
-
-    private Touchable previewTouchable;
+    private PhotoFilterTouchable previewTouchable;
     private boolean requestedCameraPermission;
 
     private void requestCameraPermission(boolean force) {

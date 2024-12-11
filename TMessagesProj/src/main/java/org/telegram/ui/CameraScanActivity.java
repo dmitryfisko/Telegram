@@ -833,7 +833,7 @@ public class CameraScanActivity extends BaseFragment {
         cameraView = new CameraView(fragmentView.getContext(), false);
         cameraView.setUseMaxPreview(true);
         cameraView.setOptimizeForBarcode(true);
-        cameraView.setDelegate(() -> {
+        cameraView.addDelegate(() -> {
             startRecognizing();
             if (isQr()) {
                 if (qrAppearing != null) {

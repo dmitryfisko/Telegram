@@ -145,8 +145,6 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
 
     private boolean isHidden;
 
-    ValueAnimator paddingAnimator;
-    private int animateToPadding;
 
     private AnimatorSet cameraInitAnimation;
     protected CameraView cameraView;
@@ -2490,7 +2488,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
             }
             cameraView.setContentDescription(LocaleController.getString(R.string.AccDescrInstantCamera));
             parentAlert.getContainer().addView(cameraView, 1, new FrameLayout.LayoutParams(itemSize, itemSize));
-            cameraView.setDelegate(new CameraView.CameraViewDelegate() {
+            cameraView.addDelegate(new CameraView.CameraViewDelegate() {
                 @Override
                 public void onCameraInit() {
                     String current = cameraView.getCameraSession().getCurrentFlashMode();

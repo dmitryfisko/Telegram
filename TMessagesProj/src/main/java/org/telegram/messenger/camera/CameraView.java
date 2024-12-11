@@ -85,6 +85,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -111,7 +112,7 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
     private TextureView textureView;
     public ImageView blurredStubView;
     private boolean inited;
-    private CameraViewDelegate delegate;
+    private List<CameraViewDelegate> delegates = new ArrayList<>();
     private int clipTop;
     private int clipBottom;
     private boolean isFrontface;
@@ -786,9 +787,7 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
     @Override
     public void onSurfaceTextureUpdated(SurfaceTexture surface) {
         if (!inited && cameraSession[0] != null && cameraSession[0].isInitiated()) {
-            if (delegate != null) {
-                delegate.onCameraInit();
-            }
+            delegates.forEach(CameraViewDelegate::onCameraInit);
             inited = true;
             if (lazy) {
                 textureView.setAlpha(0);
@@ -928,8 +927,8 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
         }
     }
 
-    public void setDelegate(CameraViewDelegate cameraViewDelegate) {
-        delegate = cameraViewDelegate;
+    public void addDelegate(CameraViewDelegate cameraViewDelegate) {
+        delegates.add(cameraViewDelegate);
     }
 
     public boolean isInited() {

@@ -1,4 +1,4 @@
-package org.telegram.ui.Stories.recorder;
+package org.telegram.ui.Components.Chat;
 
 import static org.telegram.messenger.AndroidUtilities.dp;
 import static org.telegram.messenger.AndroidUtilities.dpf2;
@@ -148,6 +148,13 @@ import org.telegram.ui.LaunchActivity;
 import org.telegram.ui.PhotoViewer;
 import org.telegram.ui.PremiumPreviewFragment;
 import org.telegram.ui.Stories.DarkThemeResourceProvider;
+import org.telegram.ui.Stories.recorder.EmojiBottomSheet;
+import org.telegram.ui.Stories.recorder.KeyboardNotifier;
+import org.telegram.ui.Stories.recorder.PreviewView;
+import org.telegram.ui.Stories.recorder.StoryEntry;
+import org.telegram.ui.Stories.recorder.StoryLinkSheet;
+import org.telegram.ui.Stories.recorder.StoryRecorder;
+import org.telegram.ui.Stories.recorder.Weather;
 import org.telegram.ui.WrappedResourceProvider;
 
 import java.io.File;
@@ -156,7 +163,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPaintView, PaintToolsView.Delegate, EntityView.EntityViewDelegate, PaintTextOptionsView.Delegate, SizeNotifierFrameLayout.SizeNotifierFrameLayoutDelegate, PhotoFilterTouchable {
+public class ChatAttachCameraPaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPaintView, PaintToolsView.Delegate, EntityView.EntityViewDelegate, PaintTextOptionsView.Delegate, SizeNotifierFrameLayout.SizeNotifierFrameLayoutDelegate, PhotoFilterTouchable {
     private PaintCancelView cancelButton;
     private PaintDoneView doneButton;
     private float offsetTranslationY;
@@ -267,7 +274,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
     private Runnable onDoneButtonClickedListener;
     private Runnable onCancelButtonClickedListener;
 
-    private StoryRecorder.WindowView parent;
+    private ChatAttachCameraRecorderView.WindowView parent;
 
     private AnimatorSet keyboardAnimator;
     public final KeyboardNotifier keyboardNotifier;
@@ -299,7 +306,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
     }
 
     @SuppressLint("NotifyDataSetChanged")
-    public PaintView(Context context, boolean fileFromGallery, File file, boolean isVideo, boolean isBot, StoryRecorder.WindowView parent, Activity activity, int currentAccount, Bitmap bitmap, Bitmap blurBitmap, Bitmap originalBitmap, int originalRotation, ArrayList<VideoEditedInfo.MediaEntity> entities, StoryEntry entry, int viewWidth, int viewHeight, MediaController.CropState cropState, Runnable onInit, BlurringShader.BlurManager blurManager, Theme.ResourcesProvider resourcesProvider, PreviewView.TextureViewHolder videoTextureHolder, PreviewView previewView) {
+    public ChatAttachCameraPaintView(Context context, boolean fileFromGallery, File file, boolean isVideo, boolean isBot, ChatAttachCameraRecorderView.WindowView parent, Activity activity, int currentAccount, Bitmap bitmap, Bitmap blurBitmap, Bitmap originalBitmap, int originalRotation, ArrayList<VideoEditedInfo.MediaEntity> entities, StoryEntry entry, int viewWidth, int viewHeight, MediaController.CropState cropState, Runnable onInit, BlurringShader.BlurManager blurManager, Theme.ResourcesProvider resourcesProvider, PreviewView.TextureViewHolder videoTextureHolder, PreviewView previewView) {
         super(context, activity, true);
         setDelegate(this);
         this.blurManager = blurManager;
@@ -994,7 +1001,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
 
                     @Override
                     public View getSnapshotDrawingView() {
-                        return PaintView.this;
+                        return ChatAttachCameraPaintView.this;
                     }
 
                     @Override
@@ -1962,7 +1969,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
 
             @Override
             protected boolean checkAudioPermission(Runnable granted) {
-                return PaintView.this.checkAudioPermission(granted);
+                return ChatAttachCameraPaintView.this.checkAudioPermission(granted);
             }
         };
         alert.setBlurDelegate(parent::drawBlurBitmap);
@@ -2024,23 +2031,23 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
                                 }
                                 @Override
                                 public Context getContext() {
-                                    return PaintView.this.getContext();
+                                    return ChatAttachCameraPaintView.this.getContext();
                                 }
                                 @Override
                                 public Activity getParentActivity() {
-                                    return AndroidUtilities.findActivity(PaintView.this.getContext());
+                                    return AndroidUtilities.findActivity(ChatAttachCameraPaintView.this.getContext());
                                 }
 
                                 @Override
                                 public Theme.ResourcesProvider getResourceProvider() {
-                                    return PaintView.this.resourcesProvider;
+                                    return ChatAttachCameraPaintView.this.resourcesProvider;
                                 }
 
                                 @Override
                                 public boolean presentFragment(BaseFragment fragment) {
                                     BaseFragment fragment1 = LaunchActivity.getLastFragment();
                                     if (fragment1 == null) return false;
-                                    BaseFragment.BottomSheetParams bottomSheetParams = new BaseFragment.BottomSheetParams();
+                                    BottomSheetParams bottomSheetParams = new BottomSheetParams();
                                     bottomSheetParams.transitionFromLeft = true;
                                     bottomSheetParams.allowNestedScroll = false;
                                     fragment1.showAsSheet(fragment, bottomSheetParams);
@@ -2119,7 +2126,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
 
             @Override
             public Activity getParentActivity() {
-                return AndroidUtilities.findActivity(PaintView.this.getContext());
+                return AndroidUtilities.findActivity(ChatAttachCameraPaintView.this.getContext());
             }
 
             @Override
@@ -2212,7 +2219,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
 
             @Override
             public Activity getParentActivity() {
-                return AndroidUtilities.findActivity(PaintView.this.getContext());
+                return AndroidUtilities.findActivity(ChatAttachCameraPaintView.this.getContext());
             }
 
             @Override
@@ -2550,7 +2557,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
                         result.add(face);
                     }
                 }
-                PaintView.this.faces = result;
+                ChatAttachCameraPaintView.this.faces = result;
             } catch (Exception e) {
                 FileLog.e(e);
             } finally {
@@ -3628,8 +3635,8 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
         setTextType((selectedTextType + 1) % 4);
     }
 
-    private PaintView.PopupButton buttonForPopup(String text, int icon, boolean selected, Runnable onClick) {
-        PaintView.PopupButton button = new PaintView.PopupButton(getContext());
+    private ChatAttachCameraPaintView.PopupButton buttonForPopup(String text, int icon, boolean selected, Runnable onClick) {
+        ChatAttachCameraPaintView.PopupButton button = new ChatAttachCameraPaintView.PopupButton(getContext());
         button.setIcon(icon);
         button.setText(text);
         button.setSelected(selected);
@@ -3891,7 +3898,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
             for (int a = 0; a < Brush.Shape.SHAPES_LIST.size(); a++) {
                 final Brush.Shape shape = Brush.Shape.SHAPES_LIST.get(a);
                 int icon = fill ? shape.getFilledIconRes() : shape.getIconRes();
-                PaintView.PopupButton button = buttonForPopup(shape.getShapeName(), icon, false, () -> {
+                ChatAttachCameraPaintView.PopupButton button = buttonForPopup(shape.getShapeName(), icon, false, () -> {
                     if (renderView.getCurrentBrush() instanceof Brush.Shape) {
                         ignoreToolChangeAnimationOnce = true;
                     }
@@ -3904,10 +3911,10 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
                         boolean newfill = PersistColorPalette.getInstance(currentAccount).getFillShapes();
                         for (int i = 0; i < popupLayout.getItemsCount(); ++i) {
                             View child = popupLayout.getItemAt(i);
-                            if (child instanceof PaintView.PopupButton) {
+                            if (child instanceof ChatAttachCameraPaintView.PopupButton) {
                                 final Brush.Shape thisshape = Brush.Shape.SHAPES_LIST.get(i);
                                 int thisicon = newfill ? thisshape.getFilledIconRes() : thisshape.getIconRes();
-                                ((PaintView.PopupButton) child).setIcon(thisicon, newfill, true);
+                                ((ChatAttachCameraPaintView.PopupButton) child).setIcon(thisicon, newfill, true);
                             }
                         }
                     }
@@ -4250,7 +4257,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
         }
 
         if (popupLayout == null) {
-            popupRect = new android.graphics.Rect();
+            popupRect = new Rect();
             popupLayout = new PopupWindowLayout(getContext());
             popupLayout.setAnimationEnabled(true);
             popupLayout.setOnTouchListener((v, event) -> {
@@ -4387,7 +4394,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
         return new Point(x, y);
     }
 
-    private PaintView.StickerPosition calculateStickerPosition(TLRPC.Document document) {
+    private ChatAttachCameraPaintView.StickerPosition calculateStickerPosition(TLRPC.Document document) {
         TLRPC.TL_maskCoords maskCoords = null;
 
         for (int a = 0; a < document.attributes.size(); a++) {
@@ -4407,7 +4414,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
             rotation = 0.0f;
             baseScale = 0.75f;
         }
-        PaintView.StickerPosition defaultPosition = new PaintView.StickerPosition(centerPositionForEntity(), baseScale, rotation);
+        ChatAttachCameraPaintView.StickerPosition defaultPosition = new ChatAttachCameraPaintView.StickerPosition(centerPositionForEntity(), baseScale, rotation);
         if (maskCoords == null || faces == null || faces.size() == 0) {
             return defaultPosition;
         } else {
@@ -4435,7 +4442,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
             float x = referencePoint.x;
             float y = referencePoint.y;
 
-            return new PaintView.StickerPosition(new Point(x, y), scale, angle);
+            return new ChatAttachCameraPaintView.StickerPosition(new Point(x, y), scale, angle);
         }
     }
 
@@ -4619,11 +4626,11 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
     }
 
     private StickerView createSticker(Object parentObject, TLRPC.Document sticker, boolean select) {
-        PaintView.StickerPosition position = calculateStickerPosition(sticker);
+        ChatAttachCameraPaintView.StickerPosition position = calculateStickerPosition(sticker);
         StickerView view = new StickerView(getContext(), position.position, position.angle, position.scale, baseStickerSize(), sticker, parentObject) {
             @Override
             protected void didSetAnimatedSticker(RLottieDrawable drawable) {
-                PaintView.this.didSetAnimatedSticker(drawable);
+                ChatAttachCameraPaintView.this.didSetAnimatedSticker(drawable);
             }
         };
         if (MessageObject.isTextColorEmoji(sticker)) {
@@ -4933,7 +4940,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
             }
             int currentHeight = (AndroidUtilities.displaySize.x > AndroidUtilities.displaySize.y ? keyboardHeightLand : keyboardHeight) + parent.getPaddingUnderContainer();
 
-            FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) currentView.getLayoutParams();
+            LayoutParams layoutParams = (LayoutParams) currentView.getLayoutParams();
             layoutParams.height = currentHeight;
             currentView.setLayoutParams(layoutParams);
             if (!AndroidUtilities.isInMultiwindow && !AndroidUtilities.isTablet() && currentEntityView instanceof TextPaintView) {
@@ -5059,7 +5066,7 @@ public class PaintView extends SizeNotifierFrameLayoutPhoto implements IPhotoPai
         if (emojiViewVisible) {
             int newHeight = (isWidthGreater ? keyboardHeightLand : keyboardHeight) + parent.getPaddingUnderContainer();
 
-            FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) emojiView.getLayoutParams();
+            LayoutParams layoutParams = (LayoutParams) emojiView.getLayoutParams();
             if (layoutParams.width != AndroidUtilities.displaySize.x || layoutParams.height != newHeight) {
                 layoutParams.width = AndroidUtilities.displaySize.x;
                 layoutParams.height = newHeight;
