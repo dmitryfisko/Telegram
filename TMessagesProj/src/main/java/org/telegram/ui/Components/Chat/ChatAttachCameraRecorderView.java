@@ -216,6 +216,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         this.currentAccount = currentAccount;
 
         initViews();
+        createCameraView();
     }
 
     private ValueAnimator openCloseAnimator;
@@ -1547,9 +1548,9 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         cameraViewThumb = new ImageView(context);
         cameraViewThumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
         cameraViewThumb.setOnClickListener(v -> {
-            if (noCameraPermission) {
-                requestCameraPermission(true);
-            }
+//            if (noCameraPermission) {
+//                requestCameraPermission(true);
+//            }
         });
         cameraViewThumb.setClickable(true);
 //        previewContainer.addView(cameraViewThumb, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
@@ -3854,7 +3855,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 
     private void onNavigateStart(int fromPage, int toPage) {
         if (toPage == PAGE_CAMERA) {
-            requestCameraPermission(false);
+//            requestCameraPermission(false);
             recordControl.setVisibility(View.VISIBLE);
             if (recordControl != null) {
                 recordControl.stopRecordingLoading(false);
@@ -5361,8 +5362,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 //        }
     }
 
-    private boolean noCameraPermission;
-
     @SuppressLint("ClickableViewAccessibility")
     private void createCameraView() {
         if (cameraView != null || getContext() == null) {
@@ -5634,56 +5633,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         }
     }
 
-
-
     private PhotoFilterTouchable previewTouchable;
-    private boolean requestedCameraPermission;
-
-    private void requestCameraPermission(boolean force) {
-        if (requestedCameraPermission && !force) {
-            return;
-        }
-        noCameraPermission = false;
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && activity != null) {
-            noCameraPermission = activity.checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED;
-            if (noCameraPermission) {
-                Drawable iconDrawable = getContext().getResources().getDrawable(R.drawable.story_camera).mutate();
-                iconDrawable.setColorFilter(new PorterDuffColorFilter(0x3dffffff, PorterDuff.Mode.MULTIPLY));
-                CombinedDrawable drawable = new CombinedDrawable(new ColorDrawable(0xff222222), iconDrawable);
-                drawable.setIconSize(dp(64), dp(64));
-                cameraViewThumb.setImageDrawable(drawable);
-                if (activity.shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)) {
-                    new AlertDialog.Builder(getContext(), resourcesProvider)
-                            .setTopAnimation(R.raw.permission_request_camera, AlertsCreator.PERMISSIONS_REQUEST_TOP_ICON_SIZE, false, Theme.getColor(Theme.key_dialogTopBackground))
-                            .setMessage(AndroidUtilities.replaceTags(getString(R.string.PermissionNoCameraWithHint)))
-                            .setPositiveButton(getString(R.string.PermissionOpenSettings), (dialogInterface, i) -> {
-                                try {
-                                    Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                                    intent.setData(Uri.parse("package:" + ApplicationLoader.applicationContext.getPackageName()));
-                                    activity.startActivity(intent);
-                                } catch (Exception e) {
-                                    FileLog.e(e);
-                                }
-                            })
-                            .setNegativeButton(getString(R.string.ContactsPermissionAlertNotNow), null)
-                            .create()
-                            .show();
-                    return;
-                }
-                activity.requestPermissions(new String[]{Manifest.permission.CAMERA}, 111);
-                requestedCameraPermission = true;
-            }
-        }
-
-        if (!noCameraPermission) {
-            if (CameraController.getInstance().isCameraInitied()) {
-                createCameraView();
-            } else {
-                CameraController.getInstance().initCamera(this::createCameraView);
-            }
-        }
-    }
 
     private boolean requestGalleryPermission() {
         if (activity != null) {
@@ -5723,11 +5673,11 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
     private void onResumeInternal() {
         if (currentPage == PAGE_CAMERA) {
 //            requestedCameraPermission = false;
-            if (openCloseAnimator != null && openCloseAnimator.isRunning()) {
-                whenOpenDone = () -> requestCameraPermission(false);
-            } else {
-                requestCameraPermission(false);
-            }
+//            if (openCloseAnimator != null && openCloseAnimator.isRunning()) {
+//                whenOpenDone = () -> requestCameraPermission(false);
+//            } else {
+//                requestCameraPermission(false);
+//            }
         }
         if (captionEdit != null) {
             captionEdit.onResume();
