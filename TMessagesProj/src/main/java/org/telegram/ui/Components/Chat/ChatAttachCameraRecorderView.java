@@ -229,7 +229,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
     private ValueAnimator openCloseAnimator;
     private float fromRounding;
     private final RectF fromRect = new RectF();
-    private float openProgress;
+    private float openProgress = 1; // TODO
     private int openType;
     private float dismissProgress;
     private Float frozenDismissProgress;
@@ -1000,6 +1000,11 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         }
 
         @Override
+        protected void onDraw(@NonNull Canvas canvas) {
+            super.onDraw(canvas);
+        }
+
+        @Override
         protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
             if (ignoreLayout) {
                 return;
@@ -1528,10 +1533,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                 }
             }
         }, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        final TextView text = new TextView(getContext());
-        text.setText("!@#$%^&*");
-        text.setTextColor(Color.RED);
-        containerView.addView(text);
         containerView.addView(containerViewControls, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         containerViewControls.addView(flashViews.foregroundView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
