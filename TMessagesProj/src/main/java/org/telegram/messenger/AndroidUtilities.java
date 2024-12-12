@@ -30,6 +30,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.Signature;
 import android.content.res.AssetFileDescriptor;
 import android.content.res.Configuration;
+import android.content.res.Resources;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -75,6 +76,7 @@ import android.text.style.DynamicDrawableSpan;
 import android.text.style.URLSpan;
 import android.text.util.Linkify;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.util.Pair;
 import android.util.StateSet;
 import android.util.TypedValue;
@@ -6314,4 +6316,34 @@ public class AndroidUtilities {
         }
     }
 
+
+    public static void printViewHierarchy(@NonNull View v) {
+        StringBuilder desc = new StringBuilder();
+        getViewHierarchy(v, desc, 0);
+        final String[] parts = desc.toString().split("\n");
+        for (int i = 0; i<parts.length; i++) {
+            Log.d("TAGTAG", parts[i]);
+        }
+    }
+
+    private static void getViewHierarchy(View v, StringBuilder desc, int margin) {
+        desc.append(getViewMessage(v, margin));
+        if (v instanceof ViewGroup) {
+            margin++;
+            ViewGroup vg = (ViewGroup) v;
+            for (int i = 0; i < vg.getChildCount(); i++) {
+                getViewHierarchy(vg.getChildAt(i), desc, margin);
+            }
+        }
+    }
+
+    private static String getViewMessage(View v, int marginOffset) {
+        String repeated = new String(new char[marginOffset]).replace("\0", "       ");
+        try {
+            String resourceId = String.valueOf(v.getId());
+            return repeated + "[" + v.getClass().getName() + "] " + resourceId + "\n";
+        } catch (Resources.NotFoundException e) {
+            return repeated + "[" + v.getClass().getName() + "] name_not_found\n";
+        }
+    }
 }

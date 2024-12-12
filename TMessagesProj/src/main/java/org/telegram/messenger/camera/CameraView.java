@@ -166,6 +166,7 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
 
     Runnable onRecordingFinishRunnable;
 
+
     public boolean startRecording(File path, Runnable onFinished) {
         cameraSessionRecording = cameraSession[0];
         cameraThread.startRecording(path);
@@ -474,6 +475,11 @@ public class CameraView extends FrameLayout implements TextureView.SurfaceTextur
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         measurementsCount = 0;
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
     }
 
     private int lastWidth = -1, lastHeight = -1;

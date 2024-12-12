@@ -15,7 +15,6 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.Dialog;
 import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
@@ -37,10 +36,8 @@ import android.graphics.RectF;
 import android.graphics.RenderNode;
 import android.graphics.Shader;
 import android.graphics.drawable.BitmapDrawable;
-import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.hardware.Camera;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Parcelable;
 import android.text.Layout;
@@ -89,7 +86,6 @@ import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.ImageLoader;
 import org.telegram.messenger.ImageReceiver;
-import org.telegram.messenger.LiteMode;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MediaController;
 import org.telegram.messenger.MediaDataController;
@@ -97,7 +93,6 @@ import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
-import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.UserObject;
 import org.telegram.messenger.Utilities;
@@ -112,11 +107,9 @@ import org.telegram.ui.ActionBar.SimpleTextView;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.AvatarSpan;
 import org.telegram.ui.Cells.ChatMessageCell;
-import org.telegram.ui.Components.AlertsCreator;
 import org.telegram.ui.Components.BlurringShader;
 import org.telegram.ui.Components.Bulletin;
 import org.telegram.ui.Components.BulletinFactory;
-import org.telegram.ui.Components.CombinedDrawable;
 import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.EmojiView;
 import org.telegram.ui.Components.FilterShaders;
@@ -161,7 +154,6 @@ import org.telegram.ui.Stories.recorder.FlashViews;
 import org.telegram.ui.Stories.recorder.GalleryListView;
 import org.telegram.ui.Stories.recorder.HintTextView;
 import org.telegram.ui.Stories.recorder.HintView2;
-import org.telegram.ui.Stories.recorder.PaintView;
 import org.telegram.ui.Stories.recorder.PhotoVideoSwitcherView;
 import org.telegram.ui.Stories.recorder.PlayPauseButton;
 import org.telegram.ui.Stories.recorder.PreviewButtons;
@@ -201,6 +193,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 
     private WindowView windowView;
     private ContainerView containerView;
+    private FrameLayout containerViewControls;
     private FlashViews flashViews;
     private ThanosEffect thanosEffect;
 
@@ -217,6 +210,20 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 
         initViews();
         createCameraView();
+
+        addView(windowView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    }
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        final int W = MeasureSpec.getSize(widthMeasureSpec);
+        final int H = MeasureSpec.getSize(heightMeasureSpec);
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+    }
+
+    @Override
+    protected void onDraw(@NonNull Canvas canvas) {
+        super.onDraw(canvas);
     }
 
     private ValueAnimator openCloseAnimator;
@@ -240,6 +247,10 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
     }
 
     private static boolean firstOpen = true;
+
+    public DualCameraView getCameraView() {
+        return cameraView;
+    }
 
     public void open(boolean animated) {
         if (isShown) {
@@ -511,7 +522,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         onClosePrepareListener = listener;
     }
 
-    private int previewW, previewH;
+//    private int previewW, previewH;
     private int underControls;
     private boolean underStatusBar;
     private boolean scrollingY, scrollingX;
@@ -565,6 +576,8 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         public int getPaddingUnderContainer() {
             return getHeight() - insetBottom - containerView.getBottom();
         }
+
+
 
         @Override
         protected void dispatchDraw(Canvas canvas) {
@@ -887,20 +900,20 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             final int w = W - insetLeft - insetRight;
 
             final int statusbar = insetTop;
-            final int navbar = insetBottom;
+//            final int navbar = insetBottom;
 
-            final int hFromW = (int) Math.ceil(w / 9f * 16f);
-            underControls = dp(48);
-            if (hFromW + underControls <= H - navbar) {
-                previewW = w;
-                previewH = hFromW;
-                underStatusBar = previewH + underControls > H - navbar - statusbar;
-            } else {
-                underStatusBar = false;
-                previewH = H - underControls - navbar - statusbar;
-                previewW = (int) Math.ceil(previewH * 9f / 16f);
-            }
-            underControls = Utilities.clamp(H - previewH - (underStatusBar ? 0 : statusbar), dp(68), dp(48));
+//            final int hFromW = (int) Math.ceil(w / 9f * 16f);
+//            underControls = dp(48);
+//            if (hFromW + underControls <= H - navbar) {
+//                previewW = w;
+//                previewH = hFromW;
+//                underStatusBar = previewH + underControls > H - navbar - statusbar;
+//            } else {
+//                underStatusBar = false;
+//                previewH = H - underControls - navbar - statusbar;
+//                previewW = (int) Math.ceil(previewH * 9f / 16f);
+//            }
+//            underControls = Utilities.clamp(H - previewH - (underStatusBar ? 0 : statusbar), dp(68), dp(48));
 
             int flags = getSystemUiVisibility();
             if (underStatusBar) {
@@ -911,8 +924,8 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             setSystemUiVisibility(flags);
 
             containerView.measure(
-                    MeasureSpec.makeMeasureSpec(previewW, MeasureSpec.EXACTLY),
-                    MeasureSpec.makeMeasureSpec(previewH + underControls, MeasureSpec.EXACTLY)
+                    MeasureSpec.makeMeasureSpec(W, MeasureSpec.EXACTLY),
+                    MeasureSpec.makeMeasureSpec(H, MeasureSpec.EXACTLY)
             );
             flashViews.backgroundView.measure(
                     MeasureSpec.makeMeasureSpec(W, MeasureSpec.EXACTLY),
@@ -935,7 +948,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             }
 
             if (galleryListView != null) {
-                galleryListView.measure(MeasureSpec.makeMeasureSpec(previewW, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(H, MeasureSpec.EXACTLY));
+                galleryListView.measure(MeasureSpec.makeMeasureSpec(W, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(H, MeasureSpec.EXACTLY));
             }
 
             if (captionEdit != null) {
@@ -995,25 +1008,26 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             final int H = bottom - top;
 
             final int statusbar = insetTop;
-            final int underControls = navbarContainer.getMeasuredHeight();
+//            final int underControls = navbarContainer.getMeasuredHeight();
 
-            final int T = underStatusBar ? 0 : statusbar;
-            int l = insetLeft + (W - insetRight - previewW) / 2,
-                    r = insetLeft + (W - insetRight + previewW) / 2, t, b;
-            if (underStatusBar) {
-                t = T;
-                b = T + previewH + underControls;
-            } else {
-                t = T + ((H - T - insetBottom) - previewH - underControls) / 2;
-                if (openType == 1 && fromRect.top + previewH + underControls < H - insetBottom) {
-                    t = (int) fromRect.top;
-                } else if (t - T < dp(40)) {
-                    t = T;
-                }
-                b = t + previewH + underControls;
-            }
+//            final int T = underStatusBar ? 0 : statusbar;
+//            int l = insetLeft + (W - insetRight - previewW) / 2,
+//                    r = insetLeft + (W - insetRight + previewW) / 2, t, b;
+//            if (underStatusBar) {
+//                t = T;
+//                b = T + previewH + underControls;
+//            } else {
+//                t = T + ((H - T - insetBottom) - previewH - underControls) / 2;
+//                if (openType == 1 && fromRect.top + previewH + underControls < H - insetBottom) {
+//                    t = (int) fromRect.top;
+//                } else if (t - T < dp(40)) {
+//                    t = T;
+//                }
+//                b = t + previewH + underControls;
+//            }
 
-            containerView.layout(l, t, r, b);
+//            containerView.layout(l, t, r, b);
+            containerView.layout(0, 0, W, H);
             flashViews.backgroundView.layout(0, 0, W, H);
             if (thanosEffect != null) {
                 thanosEffect.layout(0, 0, W, H);
@@ -1054,7 +1068,9 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                 if (child instanceof DownloadButton.PreparingVideoToast) {
                     child.layout(0, 0, W, H);
                 } else if (child instanceof Bulletin.ParentLayout) {
-                    child.layout(0, t, child.getMeasuredWidth(), t + child.getMeasuredHeight());
+                    child.layout(0, 0, W, H);
+//
+//                    child.layout(0, t, child.getMeasuredWidth(), t + child.getMeasuredHeight());
                 }
             }
         }
@@ -1160,81 +1176,99 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         }
 
         @Override
-        protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
-            final int t = underStatusBar ? insetTop : 0;
-
-            final int w = right - left;
-            final int h = bottom - top;
-
-            previewContainer.layout(0, 0, previewW, previewH);
-            previewContainer.setPivotX(previewW * .5f);
-            actionBarContainer.layout(0, t, previewW, t + actionBarContainer.getMeasuredHeight());
-            controlContainer.layout(0, previewH - controlContainer.getMeasuredHeight(), previewW, previewH);
-            navbarContainer.layout(0, previewH, previewW, previewH + navbarContainer.getMeasuredHeight());
-            captionContainer.layout(0, 0, previewW, previewH);
-            if (captionEditOverlay != null) {
-                captionEditOverlay.layout(0, 0, w, h);
-            }
-            flashViews.foregroundView.layout(0, 0, w, h);
-
-            if (captionEdit.mentionContainer != null) {
-                captionEdit.mentionContainer.layout(0, 0, previewW, previewH);
-                captionEdit.updateMentionsLayoutPosition();
-            }
-
-            if (photoFilterView != null) {
-                photoFilterView.layout(0, 0, photoFilterView.getMeasuredWidth(), photoFilterView.getMeasuredHeight());
-            }
-            if (paintView != null) {
-                paintView.layout(0, 0, paintView.getMeasuredWidth(), paintView.getMeasuredHeight());
-            }
-
-            for (int i = 0; i < getChildCount(); ++i) {
-                View child = getChildAt(i);
-                if (child instanceof ItemOptions.DimView) {
-                    child.layout(0, 0, w, h);
-                }
-            }
-
-            setPivotX((right - left) / 2f);
-            setPivotY(-h * .2f);
+        protected void onDraw(@NonNull Canvas canvas) {
+            super.onDraw(canvas);
         }
+
+        //        @Override
+//        protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+//            final int t = underStatusBar ? insetTop : 0;
+//
+//            final int w = right - left;
+//            final int h = bottom - top;
+//
+//            previewContainer.layout(0, 0, previewW, previewH);
+//            previewContainer.setPivotX(previewW * .5f);
+//            actionBarContainer.layout(0, t, previewW, t + actionBarContainer.getMeasuredHeight());
+//            controlContainer.layout(0, previewH - controlContainer.getMeasuredHeight(), previewW, previewH);
+//            navbarContainer.layout(0, previewH, previewW, previewH + navbarContainer.getMeasuredHeight());
+//            captionContainer.layout(0, 0, previewW, previewH);
+//            if (captionEditOverlay != null) {
+//                captionEditOverlay.layout(0, 0, w, h);
+//            }
+//            flashViews.foregroundView.layout(0, 0, w, h);
+//
+//            if (captionEdit.mentionContainer != null) {
+//                captionEdit.mentionContainer.layout(0, 0, previewW, previewH);
+//                captionEdit.updateMentionsLayoutPosition();
+//            }
+//
+//            if (photoFilterView != null) {
+//                photoFilterView.layout(0, 0, photoFilterView.getMeasuredWidth(), photoFilterView.getMeasuredHeight());
+//            }
+//            if (paintView != null) {
+//                paintView.layout(0, 0, paintView.getMeasuredWidth(), paintView.getMeasuredHeight());
+//            }
+//
+//            for (int i = 0; i < getChildCount(); ++i) {
+//                View child = getChildAt(i);
+//                if (child instanceof ItemOptions.DimView) {
+//                    child.layout(0, 0, w, h);
+//                }
+//            }
+//
+//            setPivotX((right - left) / 2f);
+//            setPivotY(-h * .2f);
+//        }
+//
+//        @Override
+//        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+//            final int W = MeasureSpec.getSize(widthMeasureSpec);
+//            final int H = MeasureSpec.getSize(heightMeasureSpec);
+//
+//            measureChildExactly(previewContainer, previewW, previewH);
+//            applyFilterMatrix();
+//            measureChildExactly(actionBarContainer, previewW, dp(56 + 56 + 38));
+//            measureChildExactly(controlContainer, previewW, dp(220));
+//            measureChildExactly(navbarContainer, previewW, underControls);
+//            measureChildExactly(captionContainer, previewW, previewH);
+//            measureChildExactly(flashViews.foregroundView, W, H);
+//            if (captionEditOverlay != null) {
+//                measureChildExactly(captionEditOverlay, W, H);
+//            }
+//
+//            if (captionEdit.mentionContainer != null) {
+//                measureChildExactly(captionEdit.mentionContainer, previewW, previewH);
+//            }
+//
+//            if (photoFilterView != null) {
+//                measureChildExactly(photoFilterView, W, H);
+//            }
+//            if (paintView != null) {
+//                measureChildExactly(paintView, W, H);
+//            }
+//
+//            for (int i = 0; i < getChildCount(); ++i) {
+//                View child = getChildAt(i);
+//                if (child instanceof ItemOptions.DimView) {
+//                    measureChildExactly(child, W, H);
+//                }
+//            }
+//
+//            setMeasuredDimension(W, H);
+//        }
+
 
         @Override
         protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
             final int W = MeasureSpec.getSize(widthMeasureSpec);
             final int H = MeasureSpec.getSize(heightMeasureSpec);
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+        }
 
-            measureChildExactly(previewContainer, previewW, previewH);
-            applyFilterMatrix();
-            measureChildExactly(actionBarContainer, previewW, dp(56 + 56 + 38));
-            measureChildExactly(controlContainer, previewW, dp(220));
-            measureChildExactly(navbarContainer, previewW, underControls);
-            measureChildExactly(captionContainer, previewW, previewH);
-            measureChildExactly(flashViews.foregroundView, W, H);
-            if (captionEditOverlay != null) {
-                measureChildExactly(captionEditOverlay, W, H);
-            }
-
-            if (captionEdit.mentionContainer != null) {
-                measureChildExactly(captionEdit.mentionContainer, previewW, previewH);
-            }
-
-            if (photoFilterView != null) {
-                measureChildExactly(photoFilterView, W, H);
-            }
-            if (paintView != null) {
-                measureChildExactly(paintView, W, H);
-            }
-
-            for (int i = 0; i < getChildCount(); ++i) {
-                View child = getChildAt(i);
-                if (child instanceof ItemOptions.DimView) {
-                    measureChildExactly(child, W, H);
-                }
-            }
-
-            setMeasuredDimension(W, H);
+        @Override
+        protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+            super.onLayout(changed, left, top, right, bottom);
         }
 
         private void measureChildExactly(View child, int width, int height) {
@@ -1246,18 +1280,19 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 
         @Override
         protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
-            boolean r = super.drawChild(canvas, child, drawingTime);
-            if (child == previewContainer) {
-                final float top = underStatusBar ? AndroidUtilities.statusBarHeight : 0;
-                if (topGradient == null) {
-                    topGradient = new LinearGradient(0, top, 0, top + dp(72), new int[]{0x40000000, 0x00000000}, new float[]{top / (top + dp(72)), 1}, Shader.TileMode.CLAMP);
-                    topGradientPaint.setShader(topGradient);
-                }
-                topGradientPaint.setAlpha(0xFF);
-                AndroidUtilities.rectTmp.set(0, 0, getWidth(), dp(72 + 12) + top);
-                canvas.drawRoundRect(AndroidUtilities.rectTmp, dp(12), dp(12), topGradientPaint);
-            }
-            return r;
+            return super.drawChild(canvas, child, drawingTime);
+//            boolean r = super.drawChild(canvas, child, drawingTime);
+//            if (child == previewContainer) {
+//                final float top = underStatusBar ? AndroidUtilities.statusBarHeight : 0;
+//                if (topGradient == null) {
+//                    topGradient = new LinearGradient(0, top, 0, top + dp(72), new int[]{0x40000000, 0x00000000}, new float[]{top / (top + dp(72)), 1}, Shader.TileMode.CLAMP);
+//                    topGradientPaint.setShader(topGradient);
+//                }
+//                topGradientPaint.setAlpha(0xFF);
+//                AndroidUtilities.rectTmp.set(0, 0, getWidth(), dp(72 + 12) + top);
+//                canvas.drawRoundRect(AndroidUtilities.rectTmp, dp(12), dp(12), topGradientPaint);
+//            }
+//            return r;
         }
     }
 
@@ -1273,6 +1308,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
     private int currentEditMode = EDIT_MODE_NONE;
 
     private FrameLayout previewContainer;
+    private FrameLayout previewContainerControls;
     private FrameLayout actionBarContainer;
     private LinearLayout actionBarButtons;
     private FrameLayout controlContainer;
@@ -1296,7 +1332,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
     /* PAGE_CAMERA */
     private CollageLayoutView2 collageLayoutView;
     private ImageView cameraViewThumb;
-    private DualCameraView cameraView;
+    public DualCameraView cameraView;
 
     private int flashButtonResId;
     private ToggleButton2 flashButton;
@@ -1420,7 +1456,9 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             }
         });
         windowView.addView(flashViews.backgroundView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        containerViewControls = new FrameLayout(context);
         windowView.addView(containerView = new ContainerView(context));
+        previewContainerControls =  new FrameLayout(context);
         containerView.addView(previewContainer = new FrameLayout(context) {
             @Override
             public boolean onTouchEvent(MotionEvent event) {
@@ -1431,32 +1469,32 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                 return super.onTouchEvent(event);
             }
 
-            @Override
-            protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-                super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-
-                if (photoFilterViewCurvesControl != null) {
-                    photoFilterViewCurvesControl.setActualArea(0, 0, photoFilterViewCurvesControl.getMeasuredWidth(), photoFilterViewCurvesControl.getMeasuredHeight());
-                }
-                if (photoFilterViewBlurControl != null) {
-                    photoFilterViewBlurControl.setActualAreaSize(photoFilterViewBlurControl.getMeasuredWidth(), photoFilterViewBlurControl.getMeasuredHeight());
-                }
-            }
-
-            private final Rect leftExclRect = new Rect();
-            private final Rect rightExclRect = new Rect();
-
-            @Override
-            protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
-                super.onLayout(changed, left, top, right, bottom);
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    final int w = right - left;
-                    final int h = bottom - top;
-                    leftExclRect.set(0, h - dp(120), dp(40), h);
-                    rightExclRect.set(w - dp(40), h - dp(120), w, h);
-                    setSystemGestureExclusionRects(Arrays.asList(leftExclRect, rightExclRect));
-                }
-            }
+//            @Override
+//            protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+//                super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+//
+//                if (photoFilterViewCurvesControl != null) {
+//                    photoFilterViewCurvesControl.setActualArea(0, 0, photoFilterViewCurvesControl.getMeasuredWidth(), photoFilterViewCurvesControl.getMeasuredHeight());
+//                }
+//                if (photoFilterViewBlurControl != null) {
+//                    photoFilterViewBlurControl.setActualAreaSize(photoFilterViewBlurControl.getMeasuredWidth(), photoFilterViewBlurControl.getMeasuredHeight());
+//                }
+//            }
+//
+//            private final Rect leftExclRect = new Rect();
+//            private final Rect rightExclRect = new Rect();
+//
+//            @Override
+//            protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+//                super.onLayout(changed, left, top, right, bottom);
+//                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+//                    final int w = right - left;
+//                    final int h = bottom - top;
+//                    leftExclRect.set(0, h - dp(120), dp(40), h);
+//                    rightExclRect.set(w - dp(40), h - dp(120), w, h);
+//                    setSystemGestureExclusionRects(Arrays.asList(leftExclRect, rightExclRect));
+//                }
+//            }
 
             @Override
             public void invalidate() {
@@ -1489,14 +1527,19 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                     c.drawRenderNode(renderNode);
                 }
             }
-        });
-        containerView.addView(flashViews.foregroundView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        }, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        final TextView text = new TextView(getContext());
+        text.setText("!@#$%^&*");
+        text.setTextColor(Color.RED);
+        containerView.addView(text);
+        containerView.addView(containerViewControls, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        containerViewControls.addView(flashViews.foregroundView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         blurManager = new BlurringShader.BlurManager(previewContainer);
         videoTextureHolder = new PreviewView.TextureViewHolder();
-        containerView.addView(actionBarContainer = new FrameLayout(context)); // 150dp
-        containerView.addView(controlContainer = new FrameLayout(context)); // 220dp
-        containerView.addView(captionContainer = new FrameLayout(context) {
+        containerViewControls.addView(actionBarContainer = new FrameLayout(context)); // 150dp
+        containerViewControls.addView(controlContainer = new FrameLayout(context)); // 220dp
+        containerViewControls.addView(captionContainer = new FrameLayout(context) {
             @Override
             public void setTranslationY(float translationY) {
                 if (getTranslationY() != translationY && captionEdit != null) {
@@ -1507,7 +1550,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         }); // full height
         captionContainer.setVisibility(View.GONE);
         captionContainer.setAlpha(0f);
-        containerView.addView(navbarContainer = new FrameLayout(context)); // 48dp
+        containerViewControls.addView(navbarContainer = new FrameLayout(context)); // 48dp
 
         Bulletin.addDelegate(windowView, new Bulletin.Delegate() {
             @Override
@@ -1544,6 +1587,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             updateActionBarButtons(true);
         });
         previewContainer.addView(collageLayoutView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
+        previewContainer.addView(previewContainerControls, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
 
         cameraViewThumb = new ImageView(context);
         cameraViewThumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
@@ -1553,18 +1597,18 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 //            }
         });
         cameraViewThumb.setClickable(true);
-//        previewContainer.addView(cameraViewThumb, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
+//        previewContainerControls.addView(cameraViewThumb, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
 
         previewContainer.setBackgroundColor(openType == 1 || openType == 0 ? 0 : 0xff1f1f1f);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            previewContainer.setOutlineProvider(new ViewOutlineProvider() {
-                @Override
-                public void getOutline(View view, Outline outline) {
-                    outline.setRoundRect(0, 0, view.getMeasuredWidth(), view.getMeasuredHeight(), dp(12));
-                }
-            });
-            previewContainer.setClipToOutline(true);
-        }
+//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+//            previewContainer.setOutlineProvider(new ViewOutlineProvider() {
+//                @Override
+//                public void getOutline(View view, Outline outline) {
+//                    outline.setRoundRect(0, 0, view.getMeasuredWidth(), view.getMeasuredHeight(), dp(12));
+//                }
+//            });
+//            previewContainer.setClipToOutline(true);
+//        }
         photoFilterEnhanceView = new PhotoFilterView.EnhanceView(context, this::createFilterPhotoView);
         previewView = new PreviewView(context, blurManager, videoTextureHolder) {
             @Override
@@ -1705,9 +1749,9 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             previewButtons.setShareEnabled(false);
             downloadButton.showFailedVideo();
         });
-        previewContainer.addView(previewView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
+        previewContainerControls.addView(previewView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
 
-        previewContainer.addView(photoFilterEnhanceView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
+        previewContainerControls.addView(photoFilterEnhanceView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
 
         captionEdit = new CaptionStory(context, windowView, windowView, containerView, resourcesProvider, blurManager) {
             @Override
@@ -1834,7 +1878,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                         previewView.seek(0);
                     }
                 });
-                previewContainer.addView(currentRoundRecorder = recorder, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+                previewContainerControls.addView(currentRoundRecorder = recorder, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
             }
 
             @Override
@@ -1956,7 +2000,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                 canvas.restore();
             }
         };
-        containerView.addView(captionEditOverlay);
+        containerViewControls.addView(captionEditOverlay);
 
         timelineView = new TimelineView(context, containerView, previewContainer, resourcesProvider, blurManager);
         timelineView.setOnTimelineClick(() -> {
@@ -2369,10 +2413,10 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         trash = new TrashView(context);
         trash.setAlpha(0f);
         trash.setVisibility(View.GONE);
-        previewContainer.addView(trash, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 120, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL, 0, 0, 0, 16));
+        previewContainerControls.addView(trash, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 120, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL, 0, 0, 0, 16));
 
         previewHighlight = new PreviewHighlightView(context, currentAccount, resourcesProvider);
-        previewContainer.addView(previewHighlight, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
+        previewContainerControls.addView(previewHighlight, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
 
         updateActionBarButtonsOffsets();
     }
@@ -3848,7 +3892,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             lastGalleryScrollPosition = null;
         }
 
-        if (!open && currentPage == PAGE_CAMERA && !noCameraPermission) {
+        if (!open && currentPage == PAGE_CAMERA) {
             createCameraView();
         }
     }
@@ -4661,27 +4705,27 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         };
         paintView.setHasAudio(outputEntry != null && outputEntry.audioPath != null);
         paintView.setBlurManager(blurManager);
-        containerView.addView(paintView);
+        containerViewControls.addView(paintView);
         paintViewRenderView = paintView.getRenderView();
         if (paintViewRenderView != null) {
             paintViewRenderView.getPainting().hasBlur = hasBlur;
-            previewContainer.addView(paintViewRenderView);
+            previewContainerControls.addView(paintViewRenderView);
         }
         paintViewRenderInputView = paintView.getRenderInputView();
         if (paintViewRenderInputView != null) {
-            previewContainer.addView(paintViewRenderInputView);
+            previewContainerControls.addView(paintViewRenderInputView);
         }
         paintViewTextDim = paintView.getTextDimView();
         if (paintViewTextDim != null) {
-            previewContainer.addView(paintViewTextDim);
+            previewContainerControls.addView(paintViewTextDim);
         }
         paintViewEntitiesView = paintView.getEntitiesView();
         if (paintViewEntitiesView != null) {
-            previewContainer.addView(paintViewEntitiesView);
+            previewContainerControls.addView(paintViewEntitiesView);
         }
         paintViewSelectionContainerView = paintView.getSelectionEntitiesView();
         if (paintViewSelectionContainerView != null) {
-            previewContainer.addView(paintViewSelectionContainerView);
+            previewContainerControls.addView(paintViewSelectionContainerView);
         }
         orderPreviewViews();
         paintView.setOnDoneButtonClickedListener(() -> {
@@ -5262,7 +5306,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         }
 
         photoFilterView = new PhotoFilterView(activity, previewView.getTextureView(), photoBitmap, previewView.getOrientation(), outputEntry == null ? null : outputEntry.filterState, null, 0, false, false, blurManager, resourcesProvider);
-        containerView.addView(photoFilterView);
+        containerViewControls.addView(photoFilterView);
         if (photoFilterEnhanceView != null) {
             photoFilterEnhanceView.setFilterView(photoFilterView);
         }
@@ -5278,11 +5322,11 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         applyFilterMatrix();
         photoFilterViewBlurControl = photoFilterView.getBlurControl();
         if (photoFilterViewBlurControl != null) {
-            previewContainer.addView(photoFilterViewBlurControl);
+            previewContainerControls.addView(photoFilterViewBlurControl);
         }
         photoFilterViewCurvesControl = photoFilterView.getCurveControl();
         if (photoFilterViewCurvesControl != null) {
-            previewContainer.addView(photoFilterViewCurvesControl);
+            previewContainerControls.addView(photoFilterViewCurvesControl);
         }
         orderPreviewViews();
 
@@ -5362,6 +5406,16 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 //        }
     }
 
+    public void hideControls() {
+        containerViewControls.setVisibility(View.GONE);
+        previewContainerControls.setVisibility(View.GONE);
+    }
+
+    public void showControls() {
+        containerViewControls.setVisibility(View.VISIBLE);
+        previewContainerControls.setVisibility(View.VISIBLE);
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     private void createCameraView() {
         if (cameraView != null || getContext() == null) {
@@ -5434,6 +5488,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         collageButton.setTranslationX(cameraView.dualAvailable() ? 0 : dp(46));
 //        collageLayoutView.getLast().addView(cameraView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
         collageLayoutView.setCameraView(cameraView);
+        cameraView.setId(42);
         if (MessagesController.getGlobalMainSettings().getInt("storyhint2", 0) < 1) {
             cameraHint.show();
             MessagesController.getGlobalMainSettings().edit().putInt("storyhint2", MessagesController.getGlobalMainSettings().getInt("storyhint2", 0) + 1).apply();

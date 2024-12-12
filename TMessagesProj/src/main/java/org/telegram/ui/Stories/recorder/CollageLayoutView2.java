@@ -478,6 +478,11 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
         return (float) done / total;
     }
 
+    @Override
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        super.onLayout(changed, left, top, right, bottom);
+    }
+
     private final Path clipPath = new Path();
     private void drawPart(Canvas canvas, RectF rect, Part part) {
         if (AndroidUtilities.makingGlobalBlurBitmap && part == longPressedPart) {
@@ -789,6 +794,11 @@ public class CollageLayoutView2 extends FrameLayout implements ItemOptions.Scrim
             })
             .show();
         performHapticFeedback(HapticFeedbackConstants.LONG_PRESS, HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING);
+    }
+
+    @Override
+    protected void onDraw(@NonNull Canvas canvas) {
+        super.onDraw(canvas);
     }
 
     public void retake(Part part) {
