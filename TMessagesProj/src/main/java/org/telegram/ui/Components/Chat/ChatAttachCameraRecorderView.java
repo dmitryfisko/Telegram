@@ -25,7 +25,6 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.LinearGradient;
 import android.graphics.Matrix;
-import android.graphics.Outline;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PorterDuff;
@@ -61,7 +60,6 @@ import android.view.ScaleGestureDetector;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewOutlineProvider;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
@@ -178,15 +176,17 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 public class ChatAttachCameraRecorderView extends FrameLayout implements NotificationCenter.NotificationCenterDelegate {
+
 
     private final Theme.ResourcesProvider resourcesProvider = new DarkThemeResourceProvider();
 
     private final Activity activity;
     private final int currentAccount;
+    private final boolean cameraDefaultFrontface;
+    private final boolean cameraDefaultLazy;
 
     private boolean isShown;
     private boolean prepareClosing;
@@ -202,11 +202,13 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
     private ClosingViewProvider closingSourceProvider;
     private Runnable closeListener;
 
-    public ChatAttachCameraRecorderView(Context context, int currentAccount) {
+    public ChatAttachCameraRecorderView(Context context, boolean frontface, boolean lazy, int currentAccount) {
         super(context);
 
         this.activity = AndroidUtilities.getActivity();
         this.currentAccount = currentAccount;
+        this.cameraDefaultFrontface = frontface;
+        this.cameraDefaultLazy = lazy;
 
         initViews();
         createCameraView();
@@ -271,6 +273,10 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 
         cameraViewThumb.setImageDrawable(getCameraThumb());
 
+        if (onOpenListener != null) {
+            onOpenListener.run();
+        }
+
         if (botId == 0) {
             StoriesController.StoryLimit storyLimit = MessagesController.getInstance(currentAccount).getStoriesController().checkStoryLimit();
             if (storyLimit != null && storyLimit.active(currentAccount)) {
@@ -324,27 +330,33 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         }
         outputEntry = null;
 
-        if (onClosePrepareListener != null && previewView != null) {
-            if (prepareClosing) {
-                return;
-            }
-            prepareClosing = true;
-            onClosePrepareListener.run(previewView.release(), () -> {
-                onClosePrepareListener = null;
-                prepareClosing = false;
-                close(animated);
-            }, wasSend, wasSendPeer);
-            return;
-        }
+//        if (onClosePrepareListener != null && previewView != null) {
+////            if (prepareClosing) {
+////                return;
+////            }
+////            prepareClosing = true;
+////            onClosePrepareListener.run(
+////                    previewView.release(),
+////                    () -> {
+////                        onClosePrepareListener = null;
+////                        prepareClosing = false;
+////                        close(animated);
+////                    },
+////                    wasSend,
+////                    wasSendPeer
+////            );
+//            return;
+//        }
 
-        if (previewView != null && !animated) {
-            previewView.set(null);
-        }
+//        if (previewView != null && !animated) {
+//            previewView.set(null);
+//        }
 
-        animateOpenTo(0, animated, this::onCloseDone);
+        // TODO 1 -> 0?
+        animateOpenTo(1, animated, this::onCloseDone);
         if (openType == 1 || openType == 0) {
             windowView.setBackgroundColor(0x00000000);
-            previewButtons.appear(false, true);
+//            previewButtons.appear(false, true);
         }
 
         removeNotificationObservers();
@@ -469,13 +481,14 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             if (takingVideo) {
                 CameraController.getInstance().stopVideoRecording(cameraView.getCameraSession(), false);
             }
-            destroyCameraView(false);
+//            destroyCameraView(false);
         }
-        if (previewView != null) {
-            previewView.set(null);
-        }
-        destroyPhotoPaintView();
-        destroyPhotoFilterView();
+//        if (previewView != null) {
+//            previewView.set(null);
+//        }
+        // TODO?
+//        destroyPhotoPaintView();
+//        destroyPhotoFilterView();
         if (outputFile != null && !wasSend) {
             try {
                 outputFile.delete();
@@ -491,23 +504,55 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 
         if (onCloseListener != null) {
             onCloseListener.run();
-            onCloseListener = null;
+//            onCloseListener = null;
         }
-        if (windowView != null) {
-            Bulletin.removeDelegate(windowView);
-        }
-        if (captionContainer != null) {
-            Bulletin.removeDelegate(captionContainer);
-        }
-        if (collageLayoutView != null) {
-            collageLayoutView.clear(true);
+//        if (windowView != null) {
+//            Bulletin.removeDelegate(windowView);
+//        }
+//        if (captionContainer != null) {
+//            Bulletin.removeDelegate(captionContainer);
+//        }
+//        if (collageLayoutView != null) {
+//            collageLayoutView.clear(true);
+//        }
+    }
+
+    private OnChatAttachCameraClipRectProvider onChatAttachCameraClipRectProvider;
+
+    public void setOnChatAttachCameraClipRectProvider(OnChatAttachCameraClipRectProvider onChatAttachCameraClipRectProvider) {
+        this.onChatAttachCameraClipRectProvider = onChatAttachCameraClipRectProvider;
+    }
+
+    public interface OnChatAttachCameraClipRectProvider {
+        RectF getClipRect();
+    }
+
+    @Override
+    protected void dispatchDraw(@NonNull Canvas canvas) {
+        if (onChatAttachCameraClipRectProvider != null) {
+            final RectF clipRect = onChatAttachCameraClipRectProvider.getClipRect();
+            if (clipRect != null) {
+                canvas.save();
+                canvas.clipRect(clipRect);
+            }
+            super.dispatchDraw(canvas);
+            if (clipRect != null) {
+                canvas.restore();
+            }
+        } else {
+            super.dispatchDraw(canvas);
         }
     }
 
     private Runnable onCloseListener;
+    private Runnable onOpenListener;
 
     public void setOnCloseListener(Runnable listener) {
         onCloseListener = listener;
+    }
+
+    public void setOnOpenListener(Runnable listener) {
+        onOpenListener = listener;
     }
 
     private Runnable onFullyOpenListener;
@@ -522,7 +567,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         onClosePrepareListener = listener;
     }
 
-//    private int previewW, previewH;
+    //    private int previewW, previewH;
     private int underControls;
     private boolean underStatusBar;
     private boolean scrollingY, scrollingX;
@@ -576,7 +621,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         public int getPaddingUnderContainer() {
             return getHeight() - insetBottom - containerView.getBottom();
         }
-
 
 
         @Override
@@ -1265,6 +1309,11 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 
 
         @Override
+        protected void onDetachedFromWindow() {
+            super.onDetachedFromWindow();
+        }
+
+        @Override
         protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
             final int W = MeasureSpec.getSize(widthMeasureSpec);
             final int H = MeasureSpec.getSize(heightMeasureSpec);
@@ -1463,7 +1512,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         windowView.addView(flashViews.backgroundView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         containerViewControls = new FrameLayout(context);
         windowView.addView(containerView = new ContainerView(context));
-        previewContainerControls =  new FrameLayout(context);
+        previewContainerControls = new FrameLayout(context);
         containerView.addView(previewContainer = new FrameLayout(context) {
             @Override
             public boolean onTouchEvent(MotionEvent event) {
@@ -5422,7 +5471,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         if (cameraView != null || getContext() == null) {
             return;
         }
-        cameraView = new DualCameraView(getContext(), getCameraFace(), false) {
+        cameraView = new DualCameraView(getContext(), cameraDefaultFrontface, cameraDefaultLazy) {
             @Override
             public void onEntityDraggedTop(boolean value) {
                 previewHighlight.show(true, value, actionBarContainer);
