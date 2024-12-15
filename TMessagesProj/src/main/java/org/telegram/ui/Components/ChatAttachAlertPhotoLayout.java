@@ -30,7 +30,6 @@ import android.graphics.Paint;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
-import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.hardware.Camera;
 import android.media.MediaMetadataRetriever;
@@ -2317,6 +2316,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
 
             cameraIcon.setVisibility(INVISIBLE);
 
+            recorderView.showControls();
             recorderView.open(true);
             return;
         }
@@ -2854,6 +2854,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         parentAlert.getWindow().clearFlags(FLAG_KEEP_SCREEN_ON);
         applyCameraViewPosition();
 
+        recorderView.hideControls();
         cameraIcon.setVisibility(VISIBLE);
 
         if (true) {

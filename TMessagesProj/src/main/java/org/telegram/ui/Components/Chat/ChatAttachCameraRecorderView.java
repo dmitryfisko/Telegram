@@ -302,6 +302,9 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         dismissProgress = 0;
 
         AndroidUtilities.lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        if (Build.VERSION.SDK_INT >= 21) {
+            setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
+        }
 
         animateOpenTo(1, animated, this::onOpenDone);
 
@@ -1582,7 +1585,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                 }
             }
         }, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        containerView.addView(containerViewControls, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        containerView.addView(containerViewControls, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL, 0, 32, 0, 0));
         containerViewControls.addView(flashViews.foregroundView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         blurManager = new BlurringShader.BlurManager(previewContainer);
@@ -1600,7 +1603,9 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         }); // full height
         captionContainer.setVisibility(View.GONE);
         captionContainer.setAlpha(0f);
-        containerViewControls.addView(navbarContainer = new FrameLayout(context)); // 48dp
+        final FrameLayout.LayoutParams navbarContainerParams =
+                LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 48, Gravity.BOTTOM | Gravity.FILL_HORIZONTAL);
+        containerViewControls.addView(navbarContainer = new FrameLayout(context), navbarContainerParams); // 48dp
 
         Bulletin.addDelegate(windowView, new Bulletin.Delegate() {
             @Override
@@ -1637,7 +1642,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             updateActionBarButtons(true);
         });
         previewContainer.addView(collageLayoutView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
-        previewContainer.addView(previewContainerControls, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
+        previewContainer.addView(previewContainerControls, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL, 0, 32, 0, 0));
 
         cameraViewThumb = new ImageView(context);
         cameraViewThumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
@@ -2343,7 +2348,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         recordControl = new RecordControl(context);
         recordControl.setDelegate(recordControlDelegate);
         recordControl.startAsVideo(isVideo);
-        controlContainer.addView(recordControl, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 100, Gravity.BOTTOM | Gravity.FILL_HORIZONTAL));
+        controlContainer.addView(recordControl, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 100, Gravity.BOTTOM | Gravity.FILL_HORIZONTAL, 0, 0, 0, 64));
         flashViews.add(recordControl);
         recordControl.setCollageProgress(collageLayoutView.hasLayout() ? collageLayoutView.getFilledProgress() : 0.0f, true);
 
@@ -2358,7 +2363,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         zoomControlView = new ZoomControlView(context);
         zoomControlView.enabledTouch = false;
         zoomControlView.setAlpha(0.0f);
-        controlContainer.addView(zoomControlView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 50, Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM, 0, 0, 0, 100 + 8));
+        controlContainer.addView(zoomControlView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 50, Gravity.CENTER_HORIZONTAL | Gravity.BOTTOM, 0, 0, 0, 164 + 8));
         zoomControlView.setDelegate(zoom -> {
             if (cameraView != null) {
                 cameraView.setZoom(cameraZoom = zoom);
@@ -3949,7 +3954,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 
     private void onNavigateStart(int fromPage, int toPage) {
         if (toPage == PAGE_CAMERA) {
-//            requestCameraPermission(false);
+            createCameraView();
             recordControl.setVisibility(View.VISIBLE);
             if (recordControl != null) {
                 recordControl.stopRecordingLoading(false);
@@ -5777,6 +5782,8 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 
     private void onResumeInternal() {
         if (currentPage == PAGE_CAMERA) {
+            createCameraView();
+            // TODO handle camera permission change
 //            requestedCameraPermission = false;
 //            if (openCloseAnimator != null && openCloseAnimator.isRunning()) {
 //                whenOpenDone = () -> requestCameraPermission(false);
