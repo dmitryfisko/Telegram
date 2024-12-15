@@ -2426,7 +2426,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                             privacySheet.setCover(outputEntry.coverBitmap);
                         }, previewView, paintViewRenderView, paintViewEntitiesView);
                     }
-                    navigateTo(PAGE_PREVIEW, true);
+                    cameraEntryCreatedListener.onCameraEntryCreated(outputEntry);
                 }, 400);
             }
         });
@@ -2858,6 +2858,16 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         setActionBarButtonVisible(flashButton, currentPage == PAGE_CAMERA && !collageListView.isVisible() && flashButtonMode != null && !inCheck(), animated);
     }
 
+    private AttachCameraEntryCreatedListener cameraEntryCreatedListener;
+
+    public void setCameraEntryCreatedListener(AttachCameraEntryCreatedListener cameraEntryCreatedListener) {
+        this.cameraEntryCreatedListener = cameraEntryCreatedListener;
+    }
+
+    public interface AttachCameraEntryCreatedListener {
+        void onCameraEntryCreated(StoryEntry entry);
+    }
+
     private final RecordControl.Delegate recordControlDelegate = new RecordControl.Delegate() {
         @Override
         public boolean canRecordAudio() {
@@ -2904,7 +2914,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                 modeSwitcherView.switchMode(isVideo);
             }
             StoryPrivacySelector.applySaved(currentAccount, outputEntry);
-            navigateTo(PAGE_PREVIEW, true);
+            cameraEntryCreatedListener.onCameraEntryCreated(outputEntry);
         }
 
         private void takePicture(Utilities.Callback<Runnable> done) {
@@ -2985,9 +2995,9 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                         fromGallery = false;
 
                         if (done != null) {
-                            done.run(() -> navigateTo(PAGE_PREVIEW, true));
+                            done.run(() -> cameraEntryCreatedListener.onCameraEntryCreated(entry));
                         } else {
-                            navigateTo(PAGE_PREVIEW, true);
+                            cameraEntryCreatedListener.onCameraEntryCreated(entry);
                         }
                     }
                 });
@@ -3020,9 +3030,9 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                     fromGallery = false;
 
                     if (done != null) {
-                        done.run(() -> navigateTo(PAGE_PREVIEW, true));
+                        done.run(() -> cameraEntryCreatedListener.onCameraEntryCreated(entry));
                     } else {
-                        navigateTo(PAGE_PREVIEW, true);
+                        cameraEntryCreatedListener.onCameraEntryCreated(entry);
                     }
                 }
             }
@@ -3138,8 +3148,9 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                         outputEntry.height = height;
                         outputEntry.setupMatrix();
                     }
-                    navigateToPreviewWithPlayerAwait(() -> {
-                        navigateTo(PAGE_PREVIEW, true);
+                    navigateToPreviewWithPlayerAwait(() ->
+                    {
+                        cameraEntryCreatedListener.onCameraEntryCreated(outputEntry);
                     }, 0);
                 }
             }, () /* onVideoStart */ -> {
@@ -3457,7 +3468,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             return false;
         } else if (currentPage == PAGE_COVER && !(outputEntry == null || outputEntry.isEditingCover)) {
             processDone();
-            navigateTo(PAGE_PREVIEW, true);
+            cameraEntryCreatedListener.onCameraEntryCreated(outputEntry);
             return false;
         } else {
             close(true);
@@ -3808,7 +3819,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                         if (entry instanceof MediaController.PhotoEntry) {
                             StoryPrivacySelector.applySaved(currentAccount, outputEntry);
                         }
-                        navigateTo(PAGE_PREVIEW, true);
+                        cameraEntryCreatedListener.onCameraEntryCreated(storyEntry);
                     }
                 } else if (entry instanceof StoryEntry) {
                     storyEntry = (StoryEntry) entry;
@@ -3829,7 +3840,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                     if (entry instanceof MediaController.PhotoEntry) {
                         StoryPrivacySelector.applySaved(currentAccount, outputEntry);
                     }
-                    navigateTo(PAGE_PREVIEW, true);
+                    cameraEntryCreatedListener.onCameraEntryCreated(storyEntry);
                 } else {
                     return;
                 }

@@ -2455,6 +2455,20 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
             recorderView.setOnCloseListener(() -> {
                 closeCamera(false);
             });
+            recorderView.setCameraEntryCreatedListener(entry -> {
+                final MediaController.PhotoEntry photoEntry = new MediaController.PhotoEntry(0, lastImageId++, 0, entry.file.getAbsolutePath(), entry.orientation, entry.isVideo, entry.width, entry.height, 0);
+                if (entry.collageContent != null) {
+                    ArrayList<MediaController.PhotoEntry> collageContent = new ArrayList<>();
+                    for (int i = 0; i < entry.collageContent.size(); i++) {
+                        final MediaController.PhotoEntry collagePhotoEntry =
+                                new MediaController.PhotoEntry(0, lastImageId++, 0, entry.file.getAbsolutePath(), entry.orientation, entry.isVideo, entry.width, entry.height, 0);
+                        collageContent.add(collagePhotoEntry);
+                    }
+                    photoEntry.collageContent = collageContent;
+                }
+
+                openPhotoViewer(photoEntry, true, false);
+            });
 
             AndroidUtilities.printViewHierarchy(recorderView);
 
@@ -2514,8 +2528,8 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                             maxY = AndroidUtilities.lerp(maxY, view.getMeasuredHeight(), cameraOpenProgress);
                         }
                         if (cameraAnimationInProgress) {
-                            AndroidUtilities.rectTmp.set(animationClipLeft + cameraViewOffsetX * (1f - cameraOpenProgress), animationClipTop + cameraViewOffsetY * (1f - cameraOpenProgress), animationClipRight,  animationClipBottom);
-                            outline.setRect((int) AndroidUtilities.rectTmp.left,(int) AndroidUtilities.rectTmp.top, (int) AndroidUtilities.rectTmp.right, Math.min(maxY, (int) AndroidUtilities.rectTmp.bottom));
+                            AndroidUtilities.rectTmp.set(animationClipLeft + cameraViewOffsetX * (1f - cameraOpenProgress), animationClipTop + cameraViewOffsetY * (1f - cameraOpenProgress), animationClipRight, animationClipBottom);
+                            outline.setRect((int) AndroidUtilities.rectTmp.left, (int) AndroidUtilities.rectTmp.top, (int) AndroidUtilities.rectTmp.right, Math.min(maxY, (int) AndroidUtilities.rectTmp.bottom));
                         } else if (!cameraAnimationInProgress && !cameraOpened) {
                             int rad = dp(8 * parentAlert.cornerRadius);
                             outline.setRoundRect((int) cameraViewOffsetX, (int) cameraViewOffsetY, view.getMeasuredWidth() + rad, Math.min(maxY, view.getMeasuredHeight()) + rad, rad);
@@ -2535,7 +2549,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                     } else if (!cameraAnimationInProgress && !cameraOpened) {
                         AndroidUtilities.rectTmp.set(cameraViewOffsetX, cameraViewOffsetY, getMeasuredWidth(), Math.min(maxY, getMeasuredHeight()));
                     } else {
-                        AndroidUtilities.rectTmp.set(0 , 0, getMeasuredWidth(), Math.min(maxY, getMeasuredHeight()));
+                        AndroidUtilities.rectTmp.set(0, 0, getMeasuredWidth(), Math.min(maxY, getMeasuredHeight()));
                     }
                     return AndroidUtilities.rectTmp;
                 });
