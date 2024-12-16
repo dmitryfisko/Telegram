@@ -86,6 +86,16 @@ public class DownloadButton extends ImageView {
         updateImage();
     }
 
+    public interface OnGenerationDoneListener {
+        void onGenerationDone(File savedToGalleryFile, boolean video);
+    }
+
+    private OnGenerationDoneListener onGenerationDoneListener;
+
+    public void setOnGenerationDoneListener(OnGenerationDoneListener onGenerationDoneListener) {
+        this.onGenerationDoneListener = onGenerationDoneListener;
+    }
+
     private StoryEntry currentEntry;
     private BuildingVideo buildingVideo;
     private Uri savedToGalleryUri;
@@ -183,11 +193,16 @@ public class DownloadButton extends ImageView {
                     if (!downloading || currentEntry == null) {
                         return;
                     }
-                    toast.setDone(R.raw.ic_save_to_gallery, LocaleController.getString("VideoSavedHint"), 3500);
                     downloading = false;
                     updateImage();
 
                     savedToGalleryUri = uri;
+
+                    if (onGenerationDoneListener != null) {
+                        onGenerationDoneListener.onGenerationDone(file, true);
+                    } else {
+                        toast.setDone(R.raw.ic_save_to_gallery, LocaleController.getString("VideoSavedHint"), 3500);
+                    }
                 }, false);
             }, progress -> {
                 if (toast != null) {
@@ -219,15 +234,20 @@ public class DownloadButton extends ImageView {
                     MediaController.saveFile(file.getAbsolutePath(), getContext(), 0, null, null, uri -> {
                         downloading = false;
                         updateImage();
-                        if (toast != null) {
-                            toast.hide();
-                            toast = null;
-                        }
-                        toast = new PreparingVideoToast(getContext());
-                        toast.setDone(R.raw.ic_save_to_gallery, LocaleController.getString("PhotoSavedHint"), 2500);
-                        container.addView(toast);
-
                         savedToGalleryUri = uri;
+
+                        if (onGenerationDoneListener != null) {
+                            onGenerationDoneListener.onGenerationDone(file, false);
+                        } else {
+                            if (toast != null) {
+                                toast.hide();
+                                toast = null;
+                            }
+                            toast = new PreparingVideoToast(getContext());
+                            toast.setDone(R.raw.ic_save_to_gallery, LocaleController.getString("PhotoSavedHint"), 2500);
+                            container.addView(toast);
+                        }
+
                     }, false);
                 });
             });

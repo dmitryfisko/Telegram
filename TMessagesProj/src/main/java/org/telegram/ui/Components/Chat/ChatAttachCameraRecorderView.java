@@ -27,7 +27,6 @@ import android.graphics.LinearGradient;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.graphics.PixelFormat;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.PorterDuffXfermode;
@@ -1601,7 +1600,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                     captionEdit.updateMentionsLayoutPosition();
                 }
             }
-        }); // full height
+        }, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL, 0, 0, 0, 64)); // full height
         captionContainer.setVisibility(View.GONE);
         captionContainer.setAlpha(0f);
         final FrameLayout.LayoutParams navbarContainerParams =
@@ -2103,7 +2102,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         titleTextView.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
         titleTextView.setTextColor(0xffffffff);
         titleTextView.setTypeface(AndroidUtilities.bold());
-        titleTextView.setText(getString(R.string.RecorderNewStory));
+        titleTextView.setText(getString(R.string.RecorderEditStory));
         titleTextView.getPaint().setShadowLayer(dpf2(1), 0, 1, 0x40000000);
         titleTextView.setAlpha(0f);
         titleTextView.setVisibility(View.GONE);
@@ -2121,6 +2120,13 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             applyPaintMessage();
             applyFilter(done);
         }, currentAccount, windowView, resourcesProvider);
+
+        downloadButton.setOnGenerationDoneListener((savedToGalleryFile, video) -> {
+            final StoryEntry entry = new StoryEntry();
+            entry.file = savedToGalleryFile;
+            entry.isVideo = video;
+            cameraEntryCreatedListener.onCameraEntryCreated(entry);
+        });
 
         muteHint = new HintView2(activity, HintView2.DIRECTION_TOP)
                 .setJoint(1, -77 + 8 - 2)
@@ -2433,7 +2439,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         });
         navbarContainer.addView(coverButton, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 48, Gravity.FILL, 10, 10, 10, 10));
 
-        previewButtons = new PreviewButtons(context);
+        previewButtons = new PreviewButtons(context, false);
         previewButtons.setVisibility(View.GONE);
         previewButtons.setOnClickListener((Integer btn) -> {
             if (outputEntry == null || captionEdit.isRecording()) {
@@ -2485,106 +2491,108 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         if (videoError) {
             downloadButton.showFailedVideo();
             BotWebViewVibrationEffect.APP_ERROR.vibrate();
-            AndroidUtilities.shakeViewSpring(previewButtons.shareButton, shiftDp = -shiftDp);
+//            AndroidUtilities.shakeViewSpring(previewButtons.shareButton, shiftDp = -shiftDp);
             return;
         }
-        if (captionEdit != null && captionEdit.isCaptionOverLimit()) {
-            BotWebViewVibrationEffect.APP_ERROR.vibrate();
-            AndroidUtilities.shakeViewSpring(captionEdit.limitTextView, shiftDp = -shiftDp);
-            // TODO
-//            captionEdit.captionLimitToast();
-            return;
-        }
-        if (outputEntry == null || !outputEntry.isEdit && outputEntry.botId == 0) {
-            StoriesController.StoryLimit storyLimit = MessagesController.getInstance(currentAccount).storiesController.checkStoryLimit();
-            if (storyLimit != null && storyLimit.active(currentAccount)) {
-                showLimitReachedSheet(storyLimit, false);
-                return;
-            }
-        }
-        outputEntry.captionEntitiesAllowed = MessagesController.getInstance(currentAccount).storyEntitiesAllowed();
-        if (captionEdit != null && !outputEntry.captionEntitiesAllowed) {
-            CharSequence text = captionEdit.getText();
-            if (text instanceof Spannable && (
-                    ((Spannable) text).getSpans(0, text.length(), TextStyleSpan.class).length > 0 ||
-                            ((Spannable) text).getSpans(0, text.length(), URLSpan.class).length > 0
-            )) {
-                BulletinFactory.of(windowView, resourcesProvider).createSimpleBulletin(R.raw.voip_invite, premiumText(getString(R.string.StoryPremiumFormatting))).show(true);
-                AndroidUtilities.shakeViewSpring(captionEdit, shiftDp = -shiftDp);
-                return;
-            }
-        }
-        if (outputEntry.isEdit || outputEntry.botId != 0) {
-            outputEntry.editedPrivacy = false;
-            applyFilter(null);
-            upload(true);
-        } else {
-            if (selectedDialogId != 0) {
-                outputEntry.peer = MessagesController.getInstance(currentAccount).getInputPeer(selectedDialogId);
-            }
-            previewView.updatePauseReason(3, true);
-            privacySheet = new StoryPrivacyBottomSheet(activity, outputEntry.period, resourcesProvider)
-                    .setValue(outputEntry.privacy)
-                    .setPeer(outputEntry.peer)
-                    .setCanChangePeer(canChangePeer)
-                    .whenDismiss(privacy -> {
-                        if (outputEntry != null) {
-                            outputEntry.privacy = privacy;
-                        }
-                    })
-                    .allowCover(!collageLayoutView.hasLayout())
-                    .isEdit(false)
-                    .setWarnUsers(getUsersFrom(captionEdit.getText()))
-                    .whenSelectedPeer(peer -> {
-                        if (outputEntry == null) {
-                            return;
-                        }
-                        outputEntry.peer = peer == null ? new TLRPC.TL_inputPeerSelf() : peer;
-                    })
-                    .whenSelectedRules((privacy, allowScreenshots, keepInProfile, sendAs, whenDone) -> {
-                        if (outputEntry == null) {
-                            return;
-                        }
-                        previewView.updatePauseReason(5, true);
-                        outputEntry.privacy = privacy;
-                        StoryPrivacySelector.save(currentAccount, outputEntry.privacy);
-                        outputEntry.pinned = keepInProfile;
-                        outputEntry.allowScreenshots = allowScreenshots;
-                        outputEntry.privacyRules.clear();
-                        outputEntry.privacyRules.addAll(privacy.rules);
-                        outputEntry.editedPrivacy = true;
-                        outputEntry.peer = sendAs;
-                        applyFilter(() -> {
-                            whenDone.run();
-                            upload(true);
-                        });
-                    }, false);
-            if (outputEntry.isVideo) {
-                if (previewView != null && !outputEntry.coverSet && currentPage != PAGE_COVER) {
-                    outputEntry.cover = previewView.getCurrentPosition();
-                    previewView.getCoverBitmap(bitmap -> {
-                        if (outputEntry == null) return;
-                        if (outputEntry.coverBitmap != null) {
-                            outputEntry.coverBitmap.recycle();
-                        }
-                        outputEntry.coverBitmap = bitmap;
-                        if (privacySheet == null) return;
-                        privacySheet.setCover(outputEntry.coverBitmap);
-                    }, previewView, paintViewRenderView, paintViewEntitiesView);
-                }
-                privacySheet.setCover(outputEntry.coverBitmap, () -> {
-                    if (privacySheet != null) {
-                        privacySheet.dismiss();
-                    }
-                    navigateTo(PAGE_COVER, true);
-                });
-            }
-            privacySheet.setOnDismissListener(di -> {
-                previewView.updatePauseReason(3, false);
-                privacySheet = null;
-            });
-            privacySheet.show();
-        }
+//        if (captionEdit != null && captionEdit.isCaptionOverLimit()) {
+//            BotWebViewVibrationEffect.APP_ERROR.vibrate();
+//            AndroidUtilities.shakeViewSpring(captionEdit.limitTextView, shiftDp = -shiftDp);
+//            // TODO
+////            captionEdit.captionLimitToast();
+//            return;
+//        }
+        downloadButton.callOnClick();
+
+//        if (outputEntry == null || !outputEntry.isEdit && outputEntry.botId == 0) {
+//            StoriesController.StoryLimit storyLimit = MessagesController.getInstance(currentAccount).storiesController.checkStoryLimit();
+//            if (storyLimit != null && storyLimit.active(currentAccount)) {
+//                showLimitReachedSheet(storyLimit, false);
+//                return;
+//            }
+//        }
+//        outputEntry.captionEntitiesAllowed = MessagesController.getInstance(currentAccount).storyEntitiesAllowed();
+//        if (captionEdit != null && !outputEntry.captionEntitiesAllowed) {
+//            CharSequence text = captionEdit.getText();
+//            if (text instanceof Spannable && (
+//                    ((Spannable) text).getSpans(0, text.length(), TextStyleSpan.class).length > 0 ||
+//                            ((Spannable) text).getSpans(0, text.length(), URLSpan.class).length > 0
+//            )) {
+//                BulletinFactory.of(windowView, resourcesProvider).createSimpleBulletin(R.raw.voip_invite, premiumText(getString(R.string.StoryPremiumFormatting))).show(true);
+//                AndroidUtilities.shakeViewSpring(captionEdit, shiftDp = -shiftDp);
+//                return;
+//            }
+//        }
+//        if (outputEntry.isEdit || outputEntry.botId != 0) {
+//            outputEntry.editedPrivacy = false;
+//            applyFilter(null);
+//            upload(true);
+//        } else {
+//            if (selectedDialogId != 0) {
+//                outputEntry.peer = MessagesController.getInstance(currentAccount).getInputPeer(selectedDialogId);
+//            }
+//            previewView.updatePauseReason(3, true);
+//            privacySheet = new StoryPrivacyBottomSheet(activity, outputEntry.period, resourcesProvider)
+//                    .setValue(outputEntry.privacy)
+//                    .setPeer(outputEntry.peer)
+//                    .setCanChangePeer(canChangePeer)
+//                    .whenDismiss(privacy -> {
+//                        if (outputEntry != null) {
+//                            outputEntry.privacy = privacy;
+//                        }
+//                    })
+//                    .allowCover(!collageLayoutView.hasLayout())
+//                    .isEdit(false)
+//                    .setWarnUsers(getUsersFrom(captionEdit.getText()))
+//                    .whenSelectedPeer(peer -> {
+//                        if (outputEntry == null) {
+//                            return;
+//                        }
+//                        outputEntry.peer = peer == null ? new TLRPC.TL_inputPeerSelf() : peer;
+//                    })
+//                    .whenSelectedRules((privacy, allowScreenshots, keepInProfile, sendAs, whenDone) -> {
+//                        if (outputEntry == null) {
+//                            return;
+//                        }
+//                        previewView.updatePauseReason(5, true);
+//                        outputEntry.privacy = privacy;
+//                        StoryPrivacySelector.save(currentAccount, outputEntry.privacy);
+//                        outputEntry.pinned = keepInProfile;
+//                        outputEntry.allowScreenshots = allowScreenshots;
+//                        outputEntry.privacyRules.clear();
+//                        outputEntry.privacyRules.addAll(privacy.rules);
+//                        outputEntry.editedPrivacy = true;
+//                        outputEntry.peer = sendAs;
+//                        applyFilter(() -> {
+//                            whenDone.run();
+//                            upload(true);
+//                        });
+//                    }, false);
+//            if (outputEntry.isVideo) {
+//                if (previewView != null && !outputEntry.coverSet && currentPage != PAGE_COVER) {
+//                    outputEntry.cover = previewView.getCurrentPosition();
+//                    previewView.getCoverBitmap(bitmap -> {
+//                        if (outputEntry == null) return;
+//                        if (outputEntry.coverBitmap != null) {
+//                            outputEntry.coverBitmap.recycle();
+//                        }
+//                        outputEntry.coverBitmap = bitmap;
+//                        if (privacySheet == null) return;
+//                        privacySheet.setCover(outputEntry.coverBitmap);
+//                    }, previewView, paintViewRenderView, paintViewEntitiesView);
+//                }
+//                privacySheet.setCover(outputEntry.coverBitmap, () -> {
+//                    if (privacySheet != null) {
+//                        privacySheet.dismiss();
+//                    }
+//                    navigateTo(PAGE_COVER, true);
+//                });
+//            }
+//            privacySheet.setOnDismissListener(di -> {
+//                previewView.updatePauseReason(3, false);
+//                privacySheet = null;
+//            });
+//            privacySheet.show();
+//        }
     }
 
     private Bitmap getUiBlurBitmap() {
@@ -4013,7 +4021,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             } else {
                 titleTextView.setRightPadding(AndroidUtilities.dp(48));
             }
-            downloadButton.setVisibility(View.VISIBLE);
+            downloadButton.setVisibility(View.GONE);
             if (outputEntry != null && outputEntry.isRepostMessage) {
                 getThemeButton().setVisibility(View.VISIBLE);
                 updateThemeButtonDrawable(false);
@@ -4023,9 +4031,9 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 //            privacySelector.setVisibility(View.VISIBLE);
             previewButtons.setVisibility(View.VISIBLE);
             previewView.setVisibility(View.VISIBLE);
-            captionEdit.setVisibility(isBot() ? View.GONE : View.VISIBLE);
+//            captionEdit.setVisibility(isBot() ? View.GONE : View.VISIBLE);
+            captionEdit.setVisibility(View.GONE);
             FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) videoTimelineContainerView.getLayoutParams();
-            lp.bottomMargin = isBot() ? dp(12) : dp(68);
             videoTimelineContainerView.setLayoutParams(lp);
             captionContainer.setVisibility(View.VISIBLE);
             captionContainer.clearFocus();
@@ -4051,9 +4059,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         }
         if (toPage == PAGE_PREVIEW) {
             videoError = false;
-            final boolean isBot = outputEntry != null && outputEntry.botId != 0;
-            final boolean isEdit = outputEntry != null && outputEntry.isEdit;
-            previewButtons.setShareText(getString(isEdit ? R.string.Done : isBot ? R.string.UploadBotPreview : R.string.Next), !isBot);
+            previewButtons.setShareText(getString(R.string.Next), true);
             coverTimelineView.setVisibility(View.GONE);
             coverButton.setVisibility(View.GONE);
 //            privacySelector.set(outputEntry, false);
@@ -4124,7 +4130,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                 }
                 titleTextView.setText(title);
             } else {
-                titleTextView.setText(getString(R.string.RecorderNewStory));
+                titleTextView.setText(getString(R.string.RecorderEditStory));
             }
 
 //            MediaDataController.getInstance(currentAccount).checkStickers(MediaDataController.TYPE_EMOJIPACKS);
@@ -4254,7 +4260,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             videoTimeView.setVisibility(outputEntry != null && outputEntry.duration >= 30_000 ? View.VISIBLE : View.GONE);
             captionContainer.setAlpha(1f);
             captionContainer.setTranslationY(0);
-            captionEdit.setVisibility(outputEntry != null && outputEntry.botId != 0 ? View.GONE : View.VISIBLE);
+            captionEdit.setVisibility(View.GONE);
         }
         if (toPage == PAGE_CAMERA && showSavedDraftHint) {
             getDraftSavedHint().setVisibility(View.VISIBLE);
@@ -4361,11 +4367,11 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             previewContainer.setPivotY(previewContainer.getMeasuredHeight() * .2f);
             bottomMargin = dp(164);
         } else if (editMode == EDIT_MODE_PAINT) {
-            previewContainer.setPivotY(previewContainer.getMeasuredHeight() * .6f);
-            bottomMargin = dp(40);
+            previewContainer.setPivotY(previewContainer.getMeasuredHeight() * .35f);
+            bottomMargin = dp(128 + 32);
         } else if (editMode == EDIT_MODE_TIMELINE) {
-            previewContainer.setPivotY(0);
-            bottomMargin = timelineView.getContentHeight() + dp(8);
+            previewContainer.setPivotY(previewContainer.getMeasuredHeight() * .35f);
+            bottomMargin = dp(128) + timelineView.getContentHeight();
 //            rightMargin = dp(46);
         }
 
@@ -4878,11 +4884,11 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
     private void onSwitchEditModeStart(int fromMode, int toMode) {
         if (toMode == EDIT_MODE_NONE) {
             backButton.setVisibility(View.VISIBLE);
-            captionEdit.setVisibility(View.VISIBLE);
+            captionEdit.setVisibility(View.GONE);
             if (paintView != null) {
                 paintView.clearSelection();
             }
-            downloadButton.setVisibility(View.VISIBLE);
+            downloadButton.setVisibility(View.GONE);
             if (outputEntry != null && outputEntry.isRepostMessage) {
                 getThemeButton().setVisibility(View.VISIBLE);
                 updateThemeButtonDrawable(false);
@@ -4933,7 +4939,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             captionEdit.setVisibility(View.GONE);
             muteButton.setVisibility(toMode == EDIT_MODE_TIMELINE ? View.VISIBLE : View.GONE);
             playButton.setVisibility(toMode == EDIT_MODE_TIMELINE ? View.VISIBLE : View.GONE);
-            downloadButton.setVisibility(toMode == EDIT_MODE_TIMELINE ? View.VISIBLE : View.GONE);
+            downloadButton.setVisibility(View.GONE);
             if (themeButton != null) {
                 themeButton.setVisibility(toMode == EDIT_MODE_TIMELINE ? View.VISIBLE : View.GONE);
             }

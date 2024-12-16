@@ -55,12 +55,15 @@ public class PreviewButtons extends FrameLayout {
     private String shareText;
     private boolean shareArrow = true;
 
-    public PreviewButtons(Context context) {
+    public PreviewButtons(Context context, boolean shadow) {
         super(context);
 
         shadowView = new View(context);
         shadowView.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, new int[] { 0x66000000, 0x00000000 }));
         addView(shadowView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
+        if (!shadow) {
+            shadowView.setVisibility(View.GONE);
+        }
 
         addButton(BUTTON_PAINT, R.drawable.media_draw, LocaleController.getString(R.string.AccDescrPaint));
         addButton(BUTTON_STICKER, R.drawable.msg_photo_sticker, LocaleController.getString(R.string.AccDescrStickers));

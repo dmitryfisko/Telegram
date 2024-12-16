@@ -2463,12 +2463,12 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                 closeCamera(false);
             });
             recorderView.setCameraEntryCreatedListener(entry -> {
-                final MediaController.PhotoEntry photoEntry = new MediaController.PhotoEntry(0, lastImageId++, 0, entry.file.getAbsolutePath(), entry.orientation, entry.isVideo, entry.width, entry.height, 0);
+                final MediaController.PhotoEntry photoEntry = new MediaController.PhotoEntry(0, lastImageId++, 0, entry.file.getAbsolutePath(), entry.orientation, entry.isVideo, entry.resultWidth, entry.resultHeight, 0);
                 if (entry.collageContent != null) {
                     ArrayList<MediaController.PhotoEntry> collageContent = new ArrayList<>();
                     for (int i = 0; i < entry.collageContent.size(); i++) {
                         final MediaController.PhotoEntry collagePhotoEntry =
-                                new MediaController.PhotoEntry(0, lastImageId++, 0, entry.file.getAbsolutePath(), entry.orientation, entry.isVideo, entry.width, entry.height, 0);
+                                new MediaController.PhotoEntry(0, lastImageId++, 0, entry.file.getAbsolutePath(), entry.orientation, entry.isVideo, entry.resultWidth, entry.resultHeight, 0);
                         collageContent.add(collagePhotoEntry);
                     }
                     photoEntry.collageContent = collageContent;
