@@ -50,6 +50,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
 import android.view.ViewPropertyAnimator;
+import android.view.Window;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.animation.DecelerateInterpolator;
@@ -2446,7 +2447,8 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
             final boolean lazy = !LiteMode.isEnabled(LiteMode.FLAGS_CHAT);
             final boolean frontface = isCameraFrontfaceBeforeEnteringEditMode != null ? isCameraFrontfaceBeforeEnteringEditMode : parentAlert.openWithFrontFaceCamera;
             final int currentAccount = parentAlert.currentAccount;
-            recorderView = new ChatAttachCameraRecorderView(getContext(), frontface, lazy, currentAccount);
+            final Window window = parentAlert.getWindow();
+            recorderView = new ChatAttachCameraRecorderView(getContext(), window, frontface, lazy, currentAccount);
             cameraView = recorderView.getCameraView();
             recorderView.hideControls();
 

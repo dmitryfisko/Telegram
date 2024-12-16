@@ -27,6 +27,7 @@ import android.graphics.LinearGradient;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.PixelFormat;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.PorterDuffXfermode;
@@ -60,6 +61,7 @@ import android.view.ScaleGestureDetector;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
@@ -184,6 +186,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
     private final Theme.ResourcesProvider resourcesProvider = new DarkThemeResourceProvider();
 
     private final Activity activity;
+    private final Window window;
     private final int currentAccount;
     private final boolean cameraDefaultFrontface;
     private final boolean cameraDefaultLazy;
@@ -202,10 +205,11 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
     private ClosingViewProvider closingSourceProvider;
     private Runnable closeListener;
 
-    public ChatAttachCameraRecorderView(Context context, boolean frontface, boolean lazy, int currentAccount) {
+    public ChatAttachCameraRecorderView(Context context, Window window, boolean frontface, boolean lazy, int currentAccount) {
         super(context);
 
         this.activity = AndroidUtilities.getActivity();
+        this.window = window;
         this.currentAccount = currentAccount;
         this.cameraDefaultFrontface = frontface;
         this.cameraDefaultLazy = lazy;
@@ -1474,6 +1478,29 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
     @SuppressLint("ClickableViewAccessibility")
     private void initViews() {
         Context context = getContext();
+
+        if (Build.VERSION.SDK_INT >= 28) {
+            window.getAttributes().layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+        }
+        window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
+        window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR);
+        window.addFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);
+
+        window.getAttributes().softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE;;
+        window.getAttributes().format = PixelFormat.TRANSLUCENT;
+
+        window.getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION // hide nav bar
+                        | View.SYSTEM_UI_FLAG_FULLSCREEN // hide status bar
+                        | View.SYSTEM_UI_FLAG_IMMERSIVE);
+
+//        window.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
 
         windowView = new WindowView(context);
         if (Build.VERSION.SDK_INT >= 21) {
@@ -2914,7 +2941,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                 modeSwitcherView.switchMode(isVideo);
             }
             StoryPrivacySelector.applySaved(currentAccount, outputEntry);
-            cameraEntryCreatedListener.onCameraEntryCreated(outputEntry);
+            navigateTo(PAGE_PREVIEW, true);
         }
 
         private void takePicture(Utilities.Callback<Runnable> done) {
