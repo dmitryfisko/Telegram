@@ -2300,6 +2300,11 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
             return;
         }
 
+        AndroidUtilities.hideKeyboard(this);
+        AndroidUtilities.setLightNavigationBar(parentAlert.getWindow(), false);
+
+        parentAlert.occupyNavigationBar = true;
+
         if (true) {
             cameraOpened = true;
             cameraExpanded = true;
@@ -2862,6 +2867,9 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         if (recorderView == null) {
             return;
         }
+
+        parentAlert.occupyNavigationBar = false;
+
         animateCameraValues[1] = itemSize;
         animateCameraValues[2] = itemSize;
 
@@ -2872,6 +2880,8 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
 
         recorderView.hideControls();
         cameraIcon.setVisibility(VISIBLE);
+
+        AndroidUtilities.setLightNavigationBar(parentAlert.getWindow(), AndroidUtilities.computePerceivedBrightness(getThemedColor(Theme.key_windowBackgroundGray)) > 0.721);
 
         if (true) {
             return;

@@ -306,9 +306,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         dismissProgress = 0;
 
         AndroidUtilities.lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-        if (Build.VERSION.SDK_INT >= 21) {
-            setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
-        }
 
         animateOpenTo(1, animated, this::onOpenDone);
 
@@ -1479,29 +1476,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
     private void initViews() {
         Context context = getContext();
 
-        if (Build.VERSION.SDK_INT >= 28) {
-            window.getAttributes().layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-        }
-        window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
-        window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR);
-        window.addFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);
-
-        window.getAttributes().softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE;;
-        window.getAttributes().format = PixelFormat.TRANSLUCENT;
-
-        window.getDecorView().setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION // hide nav bar
-                        | View.SYSTEM_UI_FLAG_FULLSCREEN // hide status bar
-                        | View.SYSTEM_UI_FLAG_IMMERSIVE);
-
-//        window.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
-
         windowView = new WindowView(context);
         if (Build.VERSION.SDK_INT >= 21) {
             windowView.setFitsSystemWindows(true);
@@ -1612,7 +1586,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                 }
             }
         }, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        containerView.addView(containerViewControls, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL, 0, 32, 0, 0));
+        containerView.addView(containerViewControls, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL, 0, 32, 0, 48));
         containerViewControls.addView(flashViews.foregroundView, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         blurManager = new BlurringShader.BlurManager(previewContainer);
