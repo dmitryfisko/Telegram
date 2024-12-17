@@ -995,21 +995,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                 galleryListView.measure(MeasureSpec.makeMeasureSpec(W, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(H, MeasureSpec.EXACTLY));
             }
 
-            if (captionEdit != null) {
-                EmojiView emojiView = captionEdit.editText.getEmojiView();
-                if (measureKeyboardHeight() > AndroidUtilities.dp(20)) {
-                    ignoreLayout = true;
-//                    captionEdit.editText.hideEmojiView();
-                    ignoreLayout = false;
-                }
-                if (emojiView != null) {
-                    emojiView.measure(
-                            MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY),
-                            MeasureSpec.makeMeasureSpec(emojiView.getLayoutParams().height, MeasureSpec.EXACTLY)
-                    );
-                }
-            }
-
             if (paintView != null) {
                 if (paintView.emojiView != null) {
                     paintView.emojiView.measure(
@@ -1090,13 +1075,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             }
             if (themeSheet != null) {
                 themeSheet.layout((W - themeSheet.getMeasuredWidth()) / 2, H - themeSheet.getMeasuredHeight(), (W + themeSheet.getMeasuredWidth()) / 2, H);
-            }
-
-            if (captionEdit != null) {
-                EmojiView emojiView = captionEdit.editText.getEmojiView();
-                if (emojiView != null) {
-                    emojiView.layout(insetLeft, H - insetBottom - emojiView.getMeasuredHeight(), W - insetRight, H - insetBottom);
-                }
             }
 
             if (paintView != null) {
@@ -1374,7 +1352,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
     private StoryPrivacyBottomSheet privacySheet;
     private BlurringShader.BlurManager blurManager;
     private PreviewView.TextureViewHolder videoTextureHolder;
-    private View captionEditOverlay;
 
     private boolean isReposting;
     private long botId;
@@ -1413,7 +1390,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
     private TimelineView timelineView;
     private VideoTimeView videoTimeView;
     private PreviewButtons previewButtons;
-    private CaptionStory captionEdit;
     private DownloadButton downloadButton;
     private RLottieDrawable muteButtonDrawable;
     private RLottieImageView muteButton;
@@ -1589,15 +1565,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         videoTextureHolder = new PreviewView.TextureViewHolder();
         containerViewControls.addView(actionBarContainer = new FrameLayout(context)); // 150dp
         containerViewControls.addView(controlContainer = new FrameLayout(context)); // 220dp
-        containerViewControls.addView(captionContainer = new FrameLayout(context) {
-            @Override
-            public void setTranslationY(float translationY) {
-                if (getTranslationY() != translationY && captionEdit != null) {
-                    super.setTranslationY(translationY);
-                    captionEdit.updateMentionsLayoutPosition();
-                }
-            }
-        }, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL, 0, 0, 0, 64)); // full height
+        containerViewControls.addView(captionContainer = new FrameLayout(context), LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL, 0, 0, 0, 64)); // full height
         captionContainer.setVisibility(View.GONE);
         captionContainer.setAlpha(0f);
         final FrameLayout.LayoutParams navbarContainerParams =
@@ -1665,9 +1633,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         previewView = new PreviewView(context, blurManager, videoTextureHolder) {
             @Override
             public boolean additionalTouchEvent(MotionEvent ev) {
-                if (captionEdit != null && captionEdit.isRecording()) {
-                    return false;
-                }
                 return photoFilterEnhanceView.onTouch(ev);
             }
 
@@ -1684,7 +1649,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 
             @Override
             public void onEntityDraggedBottom(boolean value) {
-                previewHighlight.updateCaption(captionEdit.getText());
+//                previewHighlight.updateCaption(captionEdit.getText());
 //                previewHighlight.show(false, value, null);
             }
 
@@ -1740,9 +1705,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                 if (paintView != null) {
                     paintView.deleteRound();
                 }
-                if (captionEdit != null) {
-                    captionEdit.setHasRoundVideo(false);
-                }
                 if (outputEntry != null) {
                     if (outputEntry.round != null) {
                         try {
@@ -1783,7 +1745,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         previewView.setCollageView(collageLayoutView);
         previewView.invalidateBlur = this::invalidateBlur;
         previewView.setOnTapListener(() -> {
-            if (currentEditMode != EDIT_MODE_NONE || currentPage != PAGE_PREVIEW || captionEdit.keyboardShown || captionEdit != null && captionEdit.isRecording()) {
+            if (currentEditMode != EDIT_MODE_NONE || currentPage != PAGE_PREVIEW) {
                 return;
             }
             if (timelineView.onBackPressed()) {
@@ -1805,255 +1767,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 
         previewContainerControls.addView(photoFilterEnhanceView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL));
 
-        captionEdit = new CaptionStory(context, windowView, windowView, containerView, resourcesProvider, blurManager) {
-            @Override
-            protected boolean ignoreTouches(float x, float y) {
-                if (paintView == null || paintView.entitiesView == null || captionEdit.keyboardShown) return false;
-                x += captionEdit.getX();
-                y += captionEdit.getY();
-                x += captionContainer.getX();
-                y += captionContainer.getY();
-                x -= previewContainer.getX();
-                y -= previewContainer.getY();
-
-                for (int i = 0; i < paintView.entitiesView.getChildCount(); ++i) {
-                    View view = paintView.entitiesView.getChildAt(i);
-                    if (view instanceof EntityView) {
-                        org.telegram.ui.Components.Rect rect = ((EntityView) view).getSelectionBounds();
-                        AndroidUtilities.rectTmp.set(rect.x, rect.y, rect.x + rect.width, rect.y + rect.height);
-                        if (AndroidUtilities.rectTmp.contains(x, y)) {
-                            return true;
-                        }
-                    }
-                }
-                return false;
-            }
-
-            @Override
-            public void setVisibility(int visibility) {
-                super.setVisibility(visibility);
-            }
-
-            @Override
-            protected void drawBlurBitmap(Bitmap bitmap, float amount) {
-                windowView.drawBlurBitmap(bitmap, amount);
-                super.drawBlurBitmap(bitmap, amount);
-            }
-
-            @Override
-            protected boolean captionLimitToast() {
-                if (MessagesController.getInstance(currentAccount).premiumFeaturesBlocked()) {
-                    return false;
-                }
-                Bulletin visibleBulletin = Bulletin.getVisibleBulletin();
-                if (visibleBulletin != null && visibleBulletin.tag == 2) {
-                    return false;
-                }
-                final int symbols = MessagesController.getInstance(currentAccount).storyCaptionLengthLimitPremium;
-                final int times = Math.round((float) symbols / MessagesController.getInstance(currentAccount).storyCaptionLengthLimitDefault);
-                SpannableStringBuilder text = AndroidUtilities.replaceTags(LocaleController.formatPluralString("CaptionPremiumSubtitle", times, "" + symbols));
-                int startIndex = text.toString().indexOf("__");
-                if (startIndex >= 0) {
-                    text.replace(startIndex, startIndex + 2, "");
-                    int endIndex = text.toString().indexOf("__");
-                    if (endIndex >= 0) {
-                        text.replace(endIndex, endIndex + 2, "");
-                        text.setSpan(new ForegroundColorSpan(Theme.getColor(Theme.key_chat_messageLinkIn, resourcesProvider)), startIndex, endIndex, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                        text.setSpan(new ClickableSpan() {
-                            @Override
-                            public void updateDrawState(@NonNull TextPaint ds) {
-                                ds.setUnderlineText(false);
-                            }
-
-                            @Override
-                            public void onClick(@NonNull View widget) {
-                                openPremium();
-                            }
-                        }, startIndex, endIndex, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                    }
-                }
-                Bulletin bulletin = BulletinFactory.of(captionContainer, resourcesProvider).createSimpleBulletin(R.raw.caption_limit, getString(R.string.CaptionPremiumTitle), text);
-                bulletin.tag = 2;
-                bulletin.setDuration(5000);
-                bulletin.show(false);
-                return true;
-            }
-
-            @Override
-            protected void onCaptionLimitUpdate(boolean overLimit) {
-                previewButtons.setShareEnabled(!videoError && !overLimit && (!MessagesController.getInstance(currentAccount).getStoriesController().hasStoryLimit() || (outputEntry != null && outputEntry.isEdit)));
-            }
-
-            @Override
-            public boolean canRecord() {
-                return requestAudioPermission();
-            }
-
-            @Override
-            public void putRecorder(RoundVideoRecorder recorder) {
-                if (currentRoundRecorder != null) {
-                    currentRoundRecorder.destroy(true);
-                }
-                if (previewView != null) {
-                    previewView.mute(true);
-                    previewView.seek(0);
-                }
-                recorder.onDone((file, thumb, duration) -> {
-                    if (previewView != null) {
-                        previewView.mute(false);
-                        previewView.seek(0);
-                    }
-                    if (outputEntry != null) {
-                        outputEntry.round = file;
-                        outputEntry.roundThumb = thumb;
-                        outputEntry.roundDuration = duration;
-                        outputEntry.roundLeft = 0;
-                        outputEntry.roundRight = 1;
-                        outputEntry.roundOffset = 0;
-                        outputEntry.roundVolume = 1f;
-
-                        createPhotoPaintView();
-                        if (previewView != null && paintView != null) {
-                            RoundView roundView = paintView.createRound(outputEntry.roundThumb, true);
-                            setHasRoundVideo(true);
-                            previewView.setupRound(outputEntry, roundView, true);
-
-                            recorder.hideTo(roundView);
-                        } else {
-                            recorder.destroy(false);
-                        }
-                    }
-                });
-                recorder.onDestroy(() -> {
-                    if (previewView != null) {
-                        previewView.mute(false);
-                        previewView.seek(0);
-                    }
-                });
-                previewContainerControls.addView(currentRoundRecorder = recorder, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
-            }
-
-            @Override
-            public void removeRound() {
-                if (previewView != null) {
-                    previewView.setupRound(null, null, true);
-                }
-                if (paintView != null) {
-                    paintView.deleteRound();
-                }
-                if (captionEdit != null) {
-                    captionEdit.setHasRoundVideo(false);
-                }
-                if (outputEntry != null) {
-                    if (outputEntry.round != null) {
-                        try {
-                            outputEntry.round.delete();
-                        } catch (Exception ignore) {
-                        }
-                        outputEntry.round = null;
-                    }
-                    if (outputEntry.roundThumb != null) {
-                        try {
-                            new File(outputEntry.roundThumb).delete();
-                        } catch (Exception ignore) {
-                        }
-                        outputEntry.roundThumb = null;
-                    }
-                }
-            }
-
-            @Override
-            public void invalidateDrawOver2() {
-                if (captionEditOverlay != null) {
-                    captionEditOverlay.invalidate();
-                }
-            }
-
-            @Override
-            public boolean drawOver2FromParent() {
-                return true;
-            }
-
-            @Override
-            public int getTimelineHeight() {
-                if (videoTimelineContainerView != null && timelineView != null && timelineView.getVisibility() == View.VISIBLE) {
-                    return timelineView.getTimelineHeight();
-                }
-                return 0;
-            }
-
-            @Override
-            protected boolean customBlur() {
-                return blurManager.hasRenderNode();
-            }
-
-            private final Path path = new Path();
-
-            @Override
-            protected void drawBlur(BlurringShader.StoryBlurDrawer blur, Canvas canvas, RectF rect, float r, boolean text, float ox, float oy, boolean thisView, float alpha) {
-                if (!canvas.isHardwareAccelerated()) {
-                    return;
-                }
-                canvas.save();
-                path.rewind();
-                path.addRoundRect(rect, r, r, Path.Direction.CW);
-                canvas.clipPath(path);
-                canvas.translate(ox, oy);
-                blur.drawRect(canvas, 0, 0, alpha);
-                canvas.restore();
-            }
-        };
-        captionEdit.setAccount(currentAccount);
-        captionEdit.setUiBlurBitmap(this::getUiBlurBitmap);
-        Bulletin.addDelegate(captionContainer, new Bulletin.Delegate() {
-            @Override
-            public int getBottomOffset(int tag) {
-                return captionEdit.getEditTextHeight() + AndroidUtilities.dp(12);
-            }
-        });
-        captionEdit.setOnHeightUpdate(height -> {
-            if (videoTimelineContainerView != null) {
-                videoTimelineContainerView.setTranslationY(currentEditMode == EDIT_MODE_TIMELINE ? dp(68) : -(captionEdit.getEditTextHeight() + dp(12)) + dp(64));
-            }
-            Bulletin visibleBulletin = Bulletin.getVisibleBulletin();
-            if (visibleBulletin != null && visibleBulletin.tag == 2) {
-                visibleBulletin.updatePosition();
-            }
-        });
-        captionEdit.setOnPeriodUpdate(period -> {
-            if (outputEntry != null) {
-                outputEntry.period = period;
-                MessagesController.getGlobalMainSettings().edit().putInt("story_period", period).apply();
-//                privacySelector.setStoryPeriod(period);
-            }
-        });
-        if (selectedDialogId != 0) {
-            captionEdit.setDialogId(selectedDialogId);
-        }
-        captionEdit.setOnPremiumHint(this::showPremiumPeriodBulletin);
-//        captionEdit.setOnKeyboardOpen(open -> {
-//            if (open && timelineView != null) {
-//                timelineView.onBackPressed();
-//            }
-//            previewView.updatePauseReason(2, open);
-//            videoTimelineContainerView.clearAnimation();
-//            videoTimelineContainerView.animate().alpha(open ? 0f : 1f).setDuration(120).start();
-//            Bulletin visibleBulletin = Bulletin.getVisibleBulletin();
-//            if (visibleBulletin != null && visibleBulletin.tag == 2) {
-//                visibleBulletin.updatePosition();
-//            }
-//        });
-        captionEditOverlay = new View(context) {
-            @Override
-            protected void dispatchDraw(Canvas canvas) {
-                canvas.save();
-                canvas.translate(captionContainer.getX() + captionEdit.getX(), captionContainer.getY() + captionEdit.getY());
-                captionEdit.drawOver2(canvas, captionEdit.getBounds(), captionEdit.getOver2Alpha());
-                canvas.restore();
-            }
-        };
-        containerViewControls.addView(captionEditOverlay);
-
         timelineView = new TimelineView(context, containerView, previewContainer, resourcesProvider, blurManager);
         timelineView.setOnTimelineClick(() -> {
             if (currentPage != PAGE_PREVIEW) return;
@@ -2068,8 +1781,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         videoTimeView.setVisibility(View.GONE);
         videoTimeView.show(false, false);
         videoTimelineContainerView.addView(videoTimeView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 25, Gravity.FILL_HORIZONTAL | Gravity.TOP, 0, 0, 0, 0));
-        captionContainer.addView(videoTimelineContainerView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, TimelineView.heightDp() + 25, Gravity.FILL_HORIZONTAL | Gravity.BOTTOM, 0, 0, 0, 68));
-        captionContainer.addView(captionEdit, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.FILL_HORIZONTAL | Gravity.BOTTOM, 0, 200, 0, 0));
+        captionContainer.addView(videoTimelineContainerView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, TimelineView.heightDp() + 25, Gravity.FILL_HORIZONTAL | Gravity.BOTTOM, 0, 0, 0, 0));
         collageLayoutView.setTimelineView(timelineView);
         collageLayoutView.setPreviewView(previewView);
 
@@ -2448,10 +2160,9 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         previewButtons = new PreviewButtons(context, false);
         previewButtons.setVisibility(View.GONE);
         previewButtons.setOnClickListener((Integer btn) -> {
-            if (outputEntry == null || captionEdit.isRecording()) {
+            if (outputEntry == null) {
                 return;
             }
-            captionEdit.clearFocus();
             if (btn == PreviewButtons.BUTTON_SHARE) {
                 processDone();
             } else if (btn == PreviewButtons.BUTTON_PAINT) {
@@ -2688,12 +2399,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         }
         destroyPhotoFilterView();
         prepareThumb(outputEntry, false);
-        CharSequence[] caption = new CharSequence[]{captionEdit.getText()};
-        ArrayList<TLRPC.MessageEntity> captionEntities = MessagesController.getInstance(currentAccount).storyEntitiesAllowed() ? MediaDataController.getInstance(currentAccount).getEntities(caption, true) : new ArrayList<>();
-        CharSequence[] pastCaption = new CharSequence[]{outputEntry.caption};
-        ArrayList<TLRPC.MessageEntity> pastEntities = MessagesController.getInstance(currentAccount).storyEntitiesAllowed() ? MediaDataController.getInstance(currentAccount).getEntities(pastCaption, true) : new ArrayList<>();
-        outputEntry.editedCaption = !TextUtils.equals(outputEntry.caption, caption[0]) || !MediaDataController.entitiesEqual(captionEntities, pastEntities);
-        outputEntry.caption = new SpannableString(captionEdit.getText());
         MessagesController.getInstance(currentAccount).getStoriesController().uploadStory(outputEntry, asStory);
         if (outputEntry.isDraft && !outputEntry.isEdit) {
             MessagesController.getInstance(currentAccount).getStoriesController().getDraftsController().delete(outputEntry);
@@ -3438,9 +3143,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         if (openCloseAnimator != null && openCloseAnimator.isRunning()) {
             return false;
         }
-        if (captionEdit != null && captionEdit.stopRecording()) {
-            return false;
-        }
         if (takingVideo) {
             recordControl.stopRecording();
             return false;
@@ -3448,9 +3150,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         if (takingPhoto) {
             return false;
         }
-        if (captionEdit.onBackPressed()) {
-            return false;
-        } else if (themeSheet != null) {
+        if (themeSheet != null) {
             themeSheet.dismiss();
             return false;
         } else if (galleryListView != null) {
@@ -3489,37 +3189,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         } else {
             close(true);
             return true;
-        }
-    }
-
-    private void setReply() {
-        if (captionEdit == null) return;
-        if (outputEntry == null || !outputEntry.isRepost) {
-            captionEdit.setReply(null, null);
-        } else {
-            TLRPC.Peer peer = outputEntry.repostPeer;
-            CharSequence peerName;
-            if (peer instanceof TLRPC.TL_peerUser) {
-                TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(peer.user_id);
-                String name = UserObject.getUserName(user);
-                peerName = outputEntry.repostPeerName = new SpannableStringBuilder(MessageObject.userSpan()).append(" ").append(name);
-            } else {
-                TLRPC.Chat chat = MessagesController.getInstance(currentAccount).getChat(-DialogObject.getPeerDialogId(peer));
-                String name = chat == null ? "" : chat.title;
-                peerName = outputEntry.repostPeerName = new SpannableStringBuilder(MessageObject.userSpan()).append(" ").append(name);
-            }
-            CharSequence repostCaption = outputEntry.repostCaption;
-            if (TextUtils.isEmpty(repostCaption)) {
-                SpannableString s = new SpannableString(getString(R.string.Story));
-                s.setSpan(new CharacterStyle() {
-                    @Override
-                    public void updateDrawState(TextPaint tp) {
-                        tp.setAlpha(0x80);
-                    }
-                }, 0, s.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                repostCaption = s;
-            }
-            captionEdit.setReply(peerName, repostCaption);
         }
     }
 
@@ -3605,7 +3274,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             animators.add(ObjectAnimator.ofFloat(collageHintTextView, View.ALPHA, page == PAGE_CAMERA && !animatedRecording && inCheck() ? 0.6f : 0));
             animators.add(ObjectAnimator.ofFloat(captionContainer, View.ALPHA, page == PAGE_PREVIEW && (outputEntry == null || outputEntry.botId == 0) || page == PAGE_COVER ? 1f : 0));
             animators.add(ObjectAnimator.ofFloat(captionContainer, View.TRANSLATION_Y, page == PAGE_PREVIEW && (outputEntry == null || outputEntry.botId == 0) || page == PAGE_COVER ? 0 : dp(12)));
-            animators.add(ObjectAnimator.ofFloat(captionEdit, View.ALPHA, page == PAGE_COVER ? 0f : 1f));
             animators.add(ObjectAnimator.ofFloat(titleTextView, View.ALPHA, page == PAGE_PREVIEW || page == PAGE_COVER ? 1f : 0));
             animators.add(ObjectAnimator.ofFloat(coverButton, View.ALPHA, page == PAGE_COVER ? 1f : 0f));
 
@@ -3648,7 +3316,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             collageHintTextView.setAlpha(page == PAGE_CAMERA && !animatedRecording && inCheck() ? 0.6f : 0);
             captionContainer.setAlpha(page == PAGE_PREVIEW || page == PAGE_COVER ? 1f : 0);
             captionContainer.setTranslationY(page == PAGE_PREVIEW || page == PAGE_COVER ? 0 : dp(12));
-            captionEdit.setAlpha(page == PAGE_COVER ? 0f : 1f);
             muteButton.setAlpha(page == PAGE_PREVIEW && isVideo ? 1f : 0);
             playButton.setAlpha(page == PAGE_PREVIEW && (isVideo || outputEntry != null && !TextUtils.isEmpty(outputEntry.audioPath)) ? 1f : 0);
             downloadButton.setAlpha(page == PAGE_PREVIEW ? 1f : 0);
@@ -3962,7 +3629,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                     galleryListView = null;
                     galleryOpenCloseAnimator = null;
                     galleryListViewOpening = null;
-                    captionEdit.keyboardNotifier.ignore(currentPage != PAGE_PREVIEW);
                 }
             });
             galleryOpenCloseAnimator.setDuration(450L);
@@ -4039,17 +3705,17 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             previewButtons.setVisibility(View.VISIBLE);
             previewView.setVisibility(View.VISIBLE);
 //            captionEdit.setVisibility(isBot() ? View.GONE : View.VISIBLE);
-            captionEdit.setVisibility(View.GONE);
+//            captionEdit.setVisibility(View.GONE);
 //            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) videoTimelineContainerView.getLayoutParams();
 //            videoTimelineContainerView.setLayoutParams(lp);
             captionContainer.setVisibility(View.VISIBLE);
             captionContainer.clearFocus();
 
 //            privacySelector.setStoryPeriod(outputEntry == null || !UserConfig.getInstance(currentAccount).isPremium() ? 86400 : outputEntry.period);
-            captionEdit.setPeriod(outputEntry == null ? 86400 : outputEntry.period, false);
-            captionEdit.setPeriodVisible(!MessagesController.getInstance(currentAccount).premiumFeaturesBlocked() && (outputEntry == null || !outputEntry.isEdit));
-            captionEdit.setHasRoundVideo(outputEntry != null && outputEntry.round != null);
-            setReply();
+//            captionEdit.setPeriod(outputEntry == null ? 86400 : outputEntry.period, false);
+//            captionEdit.setPeriodVisible(!MessagesController.getInstance(currentAccount).premiumFeaturesBlocked() && (outputEntry == null || !outputEntry.isEdit));
+//            captionEdit.setHasRoundVideo(outputEntry != null && outputEntry.round != null);
+//            setReply();
             timelineView.setOpen(outputEntry == null || !outputEntry.isCollage() || !outputEntry.hasVideo(), false);
         }
         if (toPage == PAGE_COVER || fromPage == PAGE_COVER) {
@@ -4078,9 +3744,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                 }
             }
             previewAlreadySet = false;
-            captionEdit.editText.getEditText().setOnPremiumMenuLockClickListener(MessagesController.getInstance(currentAccount).storyEntitiesAllowed() ? null : () -> {
-                BulletinFactory.of(windowView, resourcesProvider).createSimpleBulletin(R.raw.voip_invite, premiumText(getString(R.string.StoryPremiumFormatting))).show(true);
-            });
             if (outputEntry != null && (outputEntry.isDraft || outputEntry.isEdit || isReposting)) {
                 if (outputEntry.paintFile != null) {
                     destroyPhotoPaintView();
@@ -4101,12 +3764,9 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                         });
                     }
                 }
-                captionEdit.setText(outputEntry.caption);
-            } else {
-                captionEdit.clear();
             }
             previewButtons.setFiltersVisible(outputEntry == null || (!outputEntry.isRepostMessage || outputEntry.isVideo) && !outputEntry.isCollage());
-            previewButtons.setShareEnabled(!videoError && !captionEdit.isCaptionOverLimit() && (!MessagesController.getInstance(currentAccount).getStoriesController().hasStoryLimit() || (outputEntry != null && (outputEntry.isEdit || outputEntry.botId != 0))));
+            previewButtons.setShareEnabled(!videoError && (!MessagesController.getInstance(currentAccount).getStoriesController().hasStoryLimit() || (outputEntry != null && (outputEntry.isEdit || outputEntry.botId != 0))));
             muteButton.setImageResource(outputEntry != null && outputEntry.muted ? R.drawable.media_unmute : R.drawable.media_mute);
             previewView.setVisibility(View.VISIBLE);
             timelineView.setVisibility(View.VISIBLE);
@@ -4145,7 +3805,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         }
         if (fromPage == PAGE_PREVIEW) {
 //            privacySelectorHint.hide();
-            captionEdit.hidePeriodPopup();
+//            captionEdit.hidePeriodPopup();
             muteHint.hide();
         }
         if (toPage == PAGE_COVER) {
@@ -4193,10 +3853,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         }
         Bulletin.hideVisible();
 
-        if (captionEdit != null) {
-            captionEdit.closeKeyboard();
-            captionEdit.ignoreTouches = true;
-        }
         if (previewView != null) {
             previewView.updatePauseReason(8, toPage != PAGE_PREVIEW);
         }
@@ -4223,7 +3879,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         if (fromPage == PAGE_COVER) {
             coverTimelineView.setVisibility(View.GONE);
             captionContainer.setVisibility(toPage == PAGE_PREVIEW ? View.VISIBLE : View.GONE);
-            captionEdit.setVisibility(View.GONE);
             coverButton.setVisibility(View.GONE);
         }
         if (fromPage == PAGE_PREVIEW) {
@@ -4267,7 +3922,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             videoTimeView.setVisibility(outputEntry != null && outputEntry.duration >= 30_000 ? View.VISIBLE : View.GONE);
             captionContainer.setAlpha(1f);
             captionContainer.setTranslationY(0);
-            captionEdit.setVisibility(View.GONE);
         }
         if (toPage == PAGE_CAMERA && showSavedDraftHint) {
             getDraftSavedHint().setVisibility(View.VISIBLE);
@@ -4283,9 +3937,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 //            privacySelectorHint.show(false);
 //            privacySelectorHintOpened = true;
 //        }
-        if (captionEdit != null) {
-            captionEdit.ignoreTouches = toPage != PAGE_PREVIEW;
-        }
 
         if (toPage == PAGE_PREVIEW) {
             MediaDataController.getInstance(currentAccount).checkStickers(MediaDataController.TYPE_IMAGE);
@@ -4304,9 +3955,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 
     public void switchToEditMode(int editMode, boolean force, boolean animated) {
         if (currentEditMode == editMode && !force) {
-            return;
-        }
-        if (editMode != EDIT_MODE_NONE && (captionEdit != null && captionEdit.isRecording())) {
             return;
         }
 
@@ -4405,9 +4053,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             animators.add(ObjectAnimator.ofFloat(photoFilterViewBlurControl, View.ALPHA, editMode == EDIT_MODE_FILTER ? 1f : 0));
         }
 
-        animators.add(ObjectAnimator.ofFloat(captionEdit, View.ALPHA, editMode == EDIT_MODE_NONE ? 1f : 0));
         animators.add(ObjectAnimator.ofFloat(videoTimelineContainerView, View.ALPHA, editMode == EDIT_MODE_NONE || editMode == EDIT_MODE_TIMELINE ? 1f : 0));
-        animators.add(ObjectAnimator.ofFloat(videoTimelineContainerView, View.TRANSLATION_Y, editMode == EDIT_MODE_TIMELINE ? dp(68) : -(captionEdit.getEditTextHeight() + AndroidUtilities.dp(12)) + AndroidUtilities.dp(64)));
         actionBarButtons.setPivotX(actionBarButtons.getMeasuredWidth() - dp(46 / 2.0f));
         animators.add(ObjectAnimator.ofFloat(actionBarButtons, View.ROTATION, editMode == EDIT_MODE_TIMELINE ? -90 : 0));
         animators.add(ObjectAnimator.ofFloat(playButton, View.ROTATION, editMode == EDIT_MODE_TIMELINE ? 90 : 0));
@@ -4415,16 +4061,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         animators.add(ObjectAnimator.ofFloat(downloadButton, View.ROTATION, editMode == EDIT_MODE_TIMELINE ? 90 : 0));
         if (themeButton != null) {
             animators.add(ObjectAnimator.ofFloat(themeButton, View.ROTATION, editMode == EDIT_MODE_TIMELINE ? 90 : 0));
-        }
-        if (blurManager.hasRenderNode()) {
-            ValueAnimator valueAnimator = ValueAnimator.ofFloat(0, 1);
-            valueAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-                @Override
-                public void onAnimationUpdate(@NonNull ValueAnimator animation) {
-                    captionEdit.invalidateBlur();
-                }
-            });
-            animators.add(valueAnimator);
         }
 
         if (oldEditMode != editMode) {
@@ -4533,7 +4169,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 
             @Override
             protected void onGalleryClick() {
-                captionEdit.keyboardNotifier.ignore(true);
                 destroyGalleryListView();
                 createGalleryListView(true);
                 animateGalleryListView(true);
@@ -4541,7 +4176,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 
             @Override
             public void onEntityDraggedBottom(boolean value) {
-                previewHighlight.updateCaption(captionEdit.getText());
                 previewHighlight.show(false, value && multitouch, null);
             }
 
@@ -4550,8 +4184,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                 if (!isEntityDeletable()) {
                     delete = false;
                 }
-                captionEdit.clearAnimation();
-                captionEdit.animate().alpha(currentEditMode == EDIT_MODE_NONE ? 1f : 0).setDuration(180).setInterpolator(CubicBezierInterpolator.EASE_OUT).start();
                 videoTimelineContainerView.clearAnimation();
                 videoTimelineContainerView.animate().alpha(currentEditMode == EDIT_MODE_NONE || currentEditMode == EDIT_MODE_TIMELINE ? 1f : 0).setDuration(180).setInterpolator(CubicBezierInterpolator.EASE_OUT).start();
                 showTrash(false, delete);
@@ -4565,8 +4197,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             @Override
             public void onEntityDragStart() {
                 paintView.showReactionsLayout(false);
-                captionEdit.clearAnimation();
-                captionEdit.animate().alpha(0f).setDuration(180).setInterpolator(CubicBezierInterpolator.EASE_OUT).start();
                 if (currentEditMode != EDIT_MODE_TIMELINE) {
                     videoTimelineContainerView.clearAnimation();
                     videoTimelineContainerView.animate().alpha(0f).setDuration(180).setInterpolator(CubicBezierInterpolator.EASE_OUT).start();
@@ -4612,14 +4242,12 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 
             @Override
             protected void editSelectedTextEntity() {
-                captionEdit.editText.closeKeyboard();
                 switchToEditMode(EDIT_MODE_PAINT, true);
                 super.editSelectedTextEntity();
             }
 
             @Override
             public void dismiss() {
-                captionEdit.editText.closeKeyboard();
                 switchToEditMode(EDIT_MODE_NONE, true);
             }
 
@@ -4630,10 +4258,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                     if (playButton != null) {
                         playButton.drawable.setPause(previewView.isPlaying(), true);
                     }
-                }
-                if (captionEdit != null) {
-                    captionEdit.ignoreTouches = open;
-                    captionEdit.keyboardNotifier.ignore(open);
                 }
             }
 
@@ -4682,16 +4306,10 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                 if (previewView != null) {
                     previewView.attachRoundView(roundView);
                 }
-                if (captionEdit != null) {
-                    captionEdit.setHasRoundVideo(true);
-                }
             }
 
             @Override
             public void onTryDeleteRound() {
-                if (captionEdit != null) {
-                    captionEdit.showRemoveRoundAlert();
-                }
             }
 
             @Override
@@ -4701,9 +4319,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                 }
                 if (paintView != null) {
                     paintView.deleteRound();
-                }
-                if (captionEdit != null) {
-                    captionEdit.setHasRoundVideo(false);
                 }
                 if (outputEntry != null) {
                     if (outputEntry.round != null) {
@@ -4891,7 +4506,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
     private void onSwitchEditModeStart(int fromMode, int toMode) {
         if (toMode == EDIT_MODE_NONE) {
             backButton.setVisibility(View.VISIBLE);
-            captionEdit.setVisibility(View.GONE);
             if (paintView != null) {
                 paintView.clearSelection();
             }
@@ -4923,7 +4537,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         if (paintView != null) {
             paintView.keyboardNotifier.ignore(toMode != EDIT_MODE_PAINT);
         }
-        captionEdit.keyboardNotifier.ignore(toMode != EDIT_MODE_NONE);
 //        privacySelectorHint.hide();
         Bulletin.hideVisible();
         if (photoFilterView != null && fromMode == EDIT_MODE_FILTER) {
@@ -4943,7 +4556,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             paintView.setVisibility(View.GONE);
         }
         if (fromMode == EDIT_MODE_NONE) {
-            captionEdit.setVisibility(View.GONE);
             muteButton.setVisibility(toMode == EDIT_MODE_TIMELINE ? View.VISIBLE : View.GONE);
             playButton.setVisibility(toMode == EDIT_MODE_TIMELINE ? View.VISIBLE : View.GONE);
             downloadButton.setVisibility(View.GONE);
@@ -5423,9 +5035,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
     }
 
     public void invalidateBlur() {
-        if (captionEdit != null) {
-            captionEdit.invalidateBlur();
-        }
     }
 
     private void applyFilterMatrix() {
@@ -5509,7 +5118,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 
             @Override
             public void onEntityDraggedBottom(boolean value) {
-                previewHighlight.updateCaption(captionEdit.getText());
                 previewHighlight.show(false, value, controlContainer);
             }
 
@@ -5816,9 +5424,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 //                requestCameraPermission(false);
 //            }
         }
-        if (captionEdit != null) {
-            captionEdit.onResume();
-        }
         if (recordControl != null) {
             recordControl.updateGalleryImage();
         }
@@ -5837,9 +5442,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 
     private void onPauseInternal() {
         destroyCameraView(false);
-        if (captionEdit != null) {
-            captionEdit.onPause();
-        }
         if (previewView != null) {
             previewView.updatePauseReason(0, true);
         }
@@ -5876,7 +5478,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             }
         } else if (id == NotificationCenter.storiesLimitUpdate) {
             if (currentPage == PAGE_PREVIEW) {
-                previewButtons.setShareEnabled(!videoError && !captionEdit.isCaptionOverLimit() && (!MessagesController.getInstance(currentAccount).getStoriesController().hasStoryLimit() || (outputEntry != null && (outputEntry.isEdit || outputEntry.botId != 0))));
+                previewButtons.setShareEnabled(!videoError && (!MessagesController.getInstance(currentAccount).getStoriesController().hasStoryLimit() || (outputEntry != null && (outputEntry.isEdit || outputEntry.botId != 0))));
             } else if (currentPage == PAGE_CAMERA) {
                 StoriesController.StoryLimit storyLimit = MessagesController.getInstance(currentAccount).getStoriesController().checkStoryLimit();
                 if (storyLimit != null && storyLimit.active(currentAccount) && (outputEntry == null || outputEntry.botId == 0)) {
@@ -5966,9 +5568,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
     private void openPremium() {
         if (previewView != null) {
             previewView.updatePauseReason(4, true);
-        }
-        if (captionEdit != null) {
-            captionEdit.hidePeriodPopup();
         }
         PremiumFeatureBottomSheet sheet = new PremiumFeatureBottomSheet(new BaseFragment() {
             {
@@ -6068,9 +5667,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 
     public ChatAttachCameraRecorderView selectedPeerId(long dialogId) {
         this.selectedDialogId = dialogId;
-        if (captionEdit != null) {
-            captionEdit.setDialogId(dialogId);
-        }
         return this;
     }
 
