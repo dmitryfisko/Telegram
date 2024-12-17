@@ -2085,7 +2085,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         backButton = new FlashViews.ImageViewInvertable(context);
         backButton.setContentDescription(getString(R.string.AccDescrGoBack));
         backButton.setScaleType(ImageView.ScaleType.CENTER);
-        backButton.setImageResource(R.drawable.msg_photo_back);
+        backButton.setImageResource(R.drawable.msg_close);
         backButton.setColorFilter(new PorterDuffColorFilter(Color.WHITE, PorterDuff.Mode.MULTIPLY));
         backButton.setBackground(Theme.createSelectorDrawable(0x20ffffff));
         backButton.setOnClickListener(e -> {
