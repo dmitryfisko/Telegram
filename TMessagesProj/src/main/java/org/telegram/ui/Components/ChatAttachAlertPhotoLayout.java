@@ -30,6 +30,7 @@ import android.graphics.Paint;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.hardware.Camera;
 import android.media.MediaMetadataRetriever;
@@ -103,6 +104,7 @@ import org.telegram.ui.LaunchActivity;
 import org.telegram.ui.PhotoViewer;
 import org.telegram.ui.Stars.StarsIntroActivity;
 import org.telegram.ui.Stories.recorder.AlbumButton;
+import org.telegram.ui.Stories.recorder.StoryEntry;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -2464,11 +2466,21 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
             });
             recorderView.setCameraEntryCreatedListener(entry -> {
                 final MediaController.PhotoEntry photoEntry = new MediaController.PhotoEntry(0, lastImageId++, 0, entry.file.getAbsolutePath(), entry.orientation, entry.isVideo, entry.resultWidth, entry.resultHeight, 0);
+                if (entry.thumbBitmap != null) {
+                    photoEntry.thumb = new BitmapDrawable(entry.thumbBitmap);
+                }
+
+                photoEntry.thumbPath = entry.thumbPath;
                 if (entry.collageContent != null) {
                     ArrayList<MediaController.PhotoEntry> collageContent = new ArrayList<>();
                     for (int i = 0; i < entry.collageContent.size(); i++) {
+                        final StoryEntry collageEntry = entry.collageContent.get(i);
                         final MediaController.PhotoEntry collagePhotoEntry =
-                                new MediaController.PhotoEntry(0, lastImageId++, 0, entry.file.getAbsolutePath(), entry.orientation, entry.isVideo, entry.resultWidth, entry.resultHeight, 0);
+                                new MediaController.PhotoEntry(0, lastImageId++, 0, collageEntry.file.getAbsolutePath(), collageEntry.orientation, collageEntry.isVideo, collageEntry.resultWidth, collageEntry.resultHeight, 0);
+                        if (collageEntry.thumbBitmap != null) {
+                            collagePhotoEntry.thumb = new BitmapDrawable(collageEntry.thumbBitmap);
+                        }
+                        collagePhotoEntry.thumbPath = collageEntry.thumbPath;
                         collageContent.add(collagePhotoEntry);
                     }
                     photoEntry.collageContent = collageContent;
