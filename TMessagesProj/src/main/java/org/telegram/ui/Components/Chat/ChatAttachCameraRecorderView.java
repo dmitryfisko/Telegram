@@ -40,7 +40,6 @@ import android.hardware.Camera;
 import android.os.Build;
 import android.os.Parcelable;
 import android.text.Layout;
-import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
@@ -50,7 +49,6 @@ import android.text.style.CharacterStyle;
 import android.text.style.ClickableSpan;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.ImageSpan;
-import android.text.style.URLSpan;
 import android.util.Pair;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
@@ -92,6 +90,7 @@ import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
+import org.telegram.messenger.SendMessagesHelper;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.UserObject;
 import org.telegram.messenger.Utilities;
@@ -129,7 +128,6 @@ import org.telegram.ui.Components.Premium.PremiumFeatureBottomSheet;
 import org.telegram.ui.Components.RLottieDrawable;
 import org.telegram.ui.Components.RLottieImageView;
 import org.telegram.ui.Components.SizeNotifierFrameLayout;
-import org.telegram.ui.Components.TextStyleSpan;
 import org.telegram.ui.Components.ThanosEffect;
 import org.telegram.ui.Components.URLSpanUserMention;
 import org.telegram.ui.Components.VideoEditTextureView;
@@ -147,7 +145,6 @@ import org.telegram.ui.Stories.recorder.CollageLayoutButton;
 import org.telegram.ui.Stories.recorder.CollageLayoutView2;
 import org.telegram.ui.Stories.recorder.DownloadButton;
 import org.telegram.ui.Stories.recorder.DraftSavedHint;
-import org.telegram.ui.Stories.recorder.DraftsController;
 import org.telegram.ui.Stories.recorder.DualCameraView;
 import org.telegram.ui.Stories.recorder.FlashViews;
 import org.telegram.ui.Stories.recorder.GalleryListView;
@@ -2122,10 +2119,19 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         }, currentAccount, windowView, resourcesProvider);
 
         downloadButton.setOnGenerationDoneListener((savedToGalleryFile, video) -> {
-            final StoryEntry entry = new StoryEntry();
-            entry.file = savedToGalleryFile;
-            entry.isVideo = video;
-            cameraEntryCreatedListener.onCameraEntryCreated(entry);
+            Utilities.globalQueue.postRunnable(() -> {
+                File thumbnailPath = SendMessagesHelper.createVideoThumbnailPath(savedToGalleryFile.getAbsolutePath());
+                final StoryEntry entry = new StoryEntry();
+                entry.file = savedToGalleryFile;
+                if (thumbnailPath != null) {
+                    entry.thumbPath = thumbnailPath.getAbsolutePath();
+                }
+                entry.isVideo = video;
+                AndroidUtilities.runOnUIThread(() -> {
+                    cameraEntryCreatedListener.onCameraEntryCreated(entry);
+                    AndroidUtilities.runOnUIThread(() -> navigateTo(PAGE_CAMERA, true));
+                });
+            });
         });
 
         muteHint = new HintView2(activity, HintView2.DIRECTION_TOP)
@@ -4021,7 +4027,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             } else {
                 titleTextView.setRightPadding(AndroidUtilities.dp(48));
             }
-            downloadButton.setVisibility(View.GONE);
+//            downloadButton.setVisibility(View.GONE);
             if (outputEntry != null && outputEntry.isRepostMessage) {
                 getThemeButton().setVisibility(View.VISIBLE);
                 updateThemeButtonDrawable(false);
@@ -4224,7 +4230,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             captionContainer.setVisibility(toPage == PAGE_COVER ? View.VISIBLE : View.GONE);
             muteButton.setVisibility(View.GONE);
             playButton.setVisibility(View.GONE);
-            downloadButton.setVisibility(View.GONE);
+            downloadButton.setVisibility(View.VISIBLE);
             if (themeButton != null) {
                 themeButton.setVisibility(View.GONE);
             }
@@ -4370,7 +4376,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             previewContainer.setPivotY(previewContainer.getMeasuredHeight() * .35f);
             bottomMargin = dp(128 + 32);
         } else if (editMode == EDIT_MODE_TIMELINE) {
-            previewContainer.setPivotY(previewContainer.getMeasuredHeight() * .35f);
+            previewContainer.setPivotY(0);
             bottomMargin = dp(128) + timelineView.getContentHeight();
 //            rightMargin = dp(46);
         }
@@ -5688,29 +5694,29 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         builder.setTitle(getString(R.string.DiscardChanges));
         builder.setMessage(getString(R.string.PhotoEditorDiscardAlert));
         if (outputEntry != null && !outputEntry.isEdit) {
-            builder.setNeutralButton(getString(outputEntry.isDraft ? R.string.StoryKeepDraft : R.string.StorySaveDraft), (di, i) -> {
-                if (outputEntry == null) {
-                    return;
-                }
-                outputEntry.captionEntitiesAllowed = MessagesController.getInstance(currentAccount).storyEntitiesAllowed();
-                showSavedDraftHint = !outputEntry.isDraft;
-                applyFilter(null);
-                applyPaint();
-                applyPaintMessage();
-                destroyPhotoFilterView();
-                StoryEntry storyEntry = outputEntry;
-                storyEntry.destroy(true);
-                storyEntry.caption = captionEdit.getText();
-                outputEntry = null;
-                prepareThumb(storyEntry, true);
-                DraftsController drafts = MessagesController.getInstance(currentAccount).getStoriesController().getDraftsController();
-                if (storyEntry.isDraft) {
-                    drafts.edit(storyEntry);
-                } else {
-                    drafts.append(storyEntry);
-                }
-                navigateTo(PAGE_CAMERA, true);
-            });
+//            builder.setNeutralButton(getString(outputEntry.isDraft ? R.string.StoryKeepDraft : R.string.StorySaveDraft), (di, i) -> {
+//                if (outputEntry == null) {
+//                    return;
+//                }
+//                outputEntry.captionEntitiesAllowed = MessagesController.getInstance(currentAccount).storyEntitiesAllowed();
+//                showSavedDraftHint = !outputEntry.isDraft;
+//                applyFilter(null);
+//                applyPaint();
+//                applyPaintMessage();
+//                destroyPhotoFilterView();
+//                StoryEntry storyEntry = outputEntry;
+//                storyEntry.destroy(true);
+//                storyEntry.caption = captionEdit.getText();
+//                outputEntry = null;
+//                prepareThumb(storyEntry, true);
+//                DraftsController drafts = MessagesController.getInstance(currentAccount).getStoriesController().getDraftsController();
+//                if (storyEntry.isDraft) {
+//                    drafts.edit(storyEntry);
+//                } else {
+//                    drafts.append(storyEntry);
+//                }
+//                navigateTo(PAGE_CAMERA, true);
+//            });
         }
         builder.setPositiveButton(outputEntry != null && outputEntry.isDraft && !outputEntry.isEdit ? getString(R.string.StoryDeleteDraft) : getString(R.string.Discard), (dialogInterface, i) -> {
             if (outputEntry != null && !(outputEntry.isEdit || outputEntry.isRepost && !outputEntry.isRepostMessage) && outputEntry.isDraft) {

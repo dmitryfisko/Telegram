@@ -20,7 +20,6 @@ import android.os.Build;
 import android.text.Layout;
 import android.text.StaticLayout;
 import android.text.TextPaint;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -43,7 +42,6 @@ import org.telegram.messenger.VideoEncodingService;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.AnimatedFloat;
-import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.ButtonBounce;
 import org.telegram.ui.Components.CircularProgressDrawable;
 import org.telegram.ui.Components.CubicBezierInterpolator;
@@ -375,7 +373,8 @@ public class DownloadButton extends ImageView {
                         if (file != null) {
                             file.delete();
                         }
-                    } catch (Exception ignore) {}
+                    } catch (Exception ignore) {
+                    }
                     onCancel.run();
                 }
             }
@@ -464,19 +463,19 @@ public class DownloadButton extends ImageView {
             final float prepareWidth = Math.max(preparingLayoutWidth, dp(54)) + dp(21 + 21);
             final float prepareHeight = dp(21 + 54 + 18 + 18) + preparingLayout.getHeight();
             prepareRect.set(
-                (getWidth() - prepareWidth) / 2f,
-                (getHeight() - prepareHeight) / 2f,
-                (getWidth() + prepareWidth) / 2f,
-                (getHeight() + prepareHeight) / 2f
+                    (getWidth() - prepareWidth) / 2f,
+                    (getHeight() - prepareHeight) / 2f,
+                    (getWidth() + prepareWidth) / 2f,
+                    (getHeight() + prepareHeight) / 2f
             );
 
             final float toastWidth = dp(9 + 36 + 7 + 22) + doneLayoutWidth;
             final float toastHeight = dp(6 + 36 + 6);
             toastRect.set(
-                (getWidth() - toastWidth) / 2f,
-                (getHeight() - toastHeight) / 2f,
-                (getWidth() + toastWidth) / 2f,
-                (getHeight() + toastHeight) / 2f
+                    (getWidth() - toastWidth) / 2f,
+                    (getHeight() - toastHeight) / 2f,
+                    (getWidth() + toastWidth) / 2f,
+                    (getHeight() + toastHeight) / 2f
             );
 
             AndroidUtilities.lerp(prepareRect, toastRect, t, currentRect);
@@ -533,8 +532,8 @@ public class DownloadButton extends ImageView {
 
             canvas.save();
             canvas.translate(
-                prepareRect.left + dp(21) - preparingLayoutLeft,
-                prepareRect.bottom - dp(18) - preparingLayout.getHeight()
+                    prepareRect.left + dp(21) - preparingLayoutLeft,
+                    prepareRect.bottom - dp(18) - preparingLayout.getHeight()
             );
             textPaint.setAlpha((int) (0xFF * alpha));
             preparingLayout.draw(canvas);
@@ -545,10 +544,10 @@ public class DownloadButton extends ImageView {
             if (lottieDrawable != null) {
                 lottieDrawable.setAlpha((int) (0xFF * alpha));
                 lottieDrawable.setBounds(
-                    (int) (toastRect.left + dp(9)),
-                    (int) (toastRect.top + dp(6)),
-                    (int) (toastRect.left + dp(9 + 36)),
-                    (int) (toastRect.top + dp(6 + 36))
+                        (int) (toastRect.left + dp(9)),
+                        (int) (toastRect.top + dp(6)),
+                        (int) (toastRect.left + dp(9 + 36)),
+                        (int) (toastRect.top + dp(6 + 36))
                 );
                 lottieDrawable.draw(canvas);
             }
@@ -590,6 +589,7 @@ public class DownloadButton extends ImageView {
         }
 
         private Runnable hideRunnable;
+
         public void hide() {
             if (hideRunnable != null) {
                 AndroidUtilities.cancelRunOnUIThread(hideRunnable);
@@ -605,6 +605,7 @@ public class DownloadButton extends ImageView {
         }
 
         private Runnable onCancel;
+
         public void setOnCancelListener(Runnable onCancel) {
             this.onCancel = onCancel;
         }
