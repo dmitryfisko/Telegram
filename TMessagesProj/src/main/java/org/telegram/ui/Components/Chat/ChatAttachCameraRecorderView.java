@@ -2031,18 +2031,18 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             captionEdit.setDialogId(selectedDialogId);
         }
         captionEdit.setOnPremiumHint(this::showPremiumPeriodBulletin);
-        captionEdit.setOnKeyboardOpen(open -> {
-            if (open && timelineView != null) {
-                timelineView.onBackPressed();
-            }
-            previewView.updatePauseReason(2, open);
-            videoTimelineContainerView.clearAnimation();
-            videoTimelineContainerView.animate().alpha(open ? 0f : 1f).setDuration(120).start();
-            Bulletin visibleBulletin = Bulletin.getVisibleBulletin();
-            if (visibleBulletin != null && visibleBulletin.tag == 2) {
-                visibleBulletin.updatePosition();
-            }
-        });
+//        captionEdit.setOnKeyboardOpen(open -> {
+//            if (open && timelineView != null) {
+//                timelineView.onBackPressed();
+//            }
+//            previewView.updatePauseReason(2, open);
+//            videoTimelineContainerView.clearAnimation();
+//            videoTimelineContainerView.animate().alpha(open ? 0f : 1f).setDuration(120).start();
+//            Bulletin visibleBulletin = Bulletin.getVisibleBulletin();
+//            if (visibleBulletin != null && visibleBulletin.tag == 2) {
+//                visibleBulletin.updatePosition();
+//            }
+//        });
         captionEditOverlay = new View(context) {
             @Override
             protected void dispatchDraw(Canvas canvas) {
@@ -2507,6 +2507,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 ////            captionEdit.captionLimitToast();
 //            return;
 //        }
+        downloadButton.setEntry(outputEntry);
         downloadButton.callOnClick();
 
 //        if (outputEntry == null || !outputEntry.isEdit && outputEntry.botId == 0) {
@@ -4039,8 +4040,8 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             previewView.setVisibility(View.VISIBLE);
 //            captionEdit.setVisibility(isBot() ? View.GONE : View.VISIBLE);
             captionEdit.setVisibility(View.GONE);
-            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) videoTimelineContainerView.getLayoutParams();
-            videoTimelineContainerView.setLayoutParams(lp);
+//            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) videoTimelineContainerView.getLayoutParams();
+//            videoTimelineContainerView.setLayoutParams(lp);
             captionContainer.setVisibility(View.VISIBLE);
             captionContainer.clearFocus();
 
