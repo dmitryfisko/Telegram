@@ -277,13 +277,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             onOpenListener.run();
         }
 
-        if (botId == 0) {
-            StoriesController.StoryLimit storyLimit = MessagesController.getInstance(currentAccount).getStoriesController().checkStoryLimit();
-            if (storyLimit != null && storyLimit.active(currentAccount)) {
-                showLimitReachedSheet(storyLimit, true);
-            }
-        }
-
         navigateTo(PAGE_CAMERA, false);
         switchToEditMode(EDIT_MODE_NONE, false);
 
@@ -329,6 +322,13 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             outputEntry.destroy(false);
         }
         outputEntry = null;
+
+        cameraView.setTranslationX(0);
+        cameraView.setTranslationY(0);
+        containerView.setTranslationX(0);
+        cameraView.setTranslationY(0);
+        previewView.setTranslationX(0);
+        previewView.setTranslationY(0);
 
 //        if (onClosePrepareListener != null && previewView != null) {
 ////            if (prepareClosing) {
@@ -5479,71 +5479,16 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         } else if (id == NotificationCenter.storiesLimitUpdate) {
             if (currentPage == PAGE_PREVIEW) {
                 previewButtons.setShareEnabled(!videoError && (!MessagesController.getInstance(currentAccount).getStoriesController().hasStoryLimit() || (outputEntry != null && (outputEntry.isEdit || outputEntry.botId != 0))));
-            } else if (currentPage == PAGE_CAMERA) {
-                StoriesController.StoryLimit storyLimit = MessagesController.getInstance(currentAccount).getStoriesController().checkStoryLimit();
-                if (storyLimit != null && storyLimit.active(currentAccount) && (outputEntry == null || outputEntry.botId == 0)) {
-                    showLimitReachedSheet(storyLimit, true);
-                }
             }
         }
     }
 
     public void addNotificationObservers() {
         NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.albumsDidLoad);
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.storiesDraftsUpdated);
-        NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.storiesLimitUpdate);
     }
 
     public void removeNotificationObservers() {
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.albumsDidLoad);
-        NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.storiesDraftsUpdated);
-        NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.storiesLimitUpdate);
-    }
-
-    private boolean shownLimitReached;
-
-    private void showLimitReachedSheet(StoriesController.StoryLimit storyLimit, boolean closeRecorder) {
-        if (shownLimitReached) {
-            return;
-        }
-        final LimitReachedBottomSheet sheet = new LimitReachedBottomSheet(new BaseFragment() {
-            @Override
-            public boolean isLightStatusBar() {
-                return false;
-            }
-
-            @Override
-            public Activity getParentActivity() {
-                return activity;
-            }
-
-            @Override
-            public Theme.ResourcesProvider getResourceProvider() {
-                return new WrappedResourceProvider(resourcesProvider) {
-                    @Override
-                    public void appendColors() {
-                        sparseIntArray.append(Theme.key_dialogBackground, 0xFF1F1F1F);
-                        sparseIntArray.append(Theme.key_windowBackgroundGray, 0xFF333333);
-                    }
-                };
-            }
-
-            @Override
-            public boolean presentFragment(BaseFragment fragment) {
-                openPremium();
-                return false;
-            }
-        }, activity, storyLimit.getLimitReachedType(), currentAccount, null);
-        sheet.setOnDismissListener(e -> {
-            shownLimitReached = false;
-            previewView.updatePauseReason(7, true);
-            if (closeRecorder) {
-                close(true);
-            }
-        });
-        previewView.updatePauseReason(7, true);
-        shownLimitReached = true;
-        sheet.show();
     }
 
     private boolean isBackgroundVisible;

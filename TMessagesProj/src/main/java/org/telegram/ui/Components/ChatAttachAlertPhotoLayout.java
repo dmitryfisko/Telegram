@@ -25,6 +25,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Outline;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
@@ -1490,6 +1491,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                     dragging = false;
                     if (recorderView != null) {
                         if (Math.abs(recorderView.getTranslationY()) > recorderView.getMeasuredHeight() / 6.0f) {
+                            recorderView.onBackPressed();
                             closeCamera();
                         } else {
                             AnimatorSet animatorSet = new AnimatorSet();
@@ -1850,7 +1852,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
     boolean cameraExpanded;
 
     private void openCamera() {
-        if (recorderView == null || cameraInitAnimation != null || parentAlert.isDismissed()) {
+        if (recorderView == null || cameraView == null || cameraInitAnimation != null || parentAlert.isDismissed()) {
             return;
         }
 
@@ -1861,6 +1863,8 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
 
         cameraOpened = true;
         cameraExpanded = true;
+
+        parentAlert.getWindow().addFlags(FLAG_KEEP_SCREEN_ON);
 
         animateCameraValues[0] = 0;
         animateCameraValues[1] = itemSize;
@@ -1873,6 +1877,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         recorderView.setScaleY(1f);
         recorderView.setLayoutParams(new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
 
+        cameraView.setFpsLimit(-1);
         cameraIcon.setVisibility(INVISIBLE);
 
         recorderView.showControls();
@@ -2263,108 +2268,19 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         cameraOpened = false;
         cameraExpanded = false;
         parentAlert.getWindow().clearFlags(FLAG_KEEP_SCREEN_ON);
-        applyCameraViewPosition();
 
+        cameraView.setFpsLimit(30);
         recorderView.hideControls();
         cameraIcon.setVisibility(VISIBLE);
 
         AndroidUtilities.setLightNavigationBar(parentAlert.getWindow(), AndroidUtilities.computePerceivedBrightness(getThemedColor(Theme.key_windowBackgroundGray)) > 0.721);
+        applyCameraViewPosition();
     }
 
     float animationClipTop;
     float animationClipBottom;
     float animationClipRight;
     float animationClipLeft;
-
-    @Keep
-    public void setCameraOpenProgress(float value) {
-        if (recorderView == null) {
-            return;
-        }
-        cameraOpenProgress = value;
-        float startWidth = animateCameraValues[1];
-        float startHeight = animateCameraValues[2];
-        boolean isPortrait = AndroidUtilities.displaySize.x < AndroidUtilities.displaySize.y;
-        float endWidth = parentAlert.getContainer().getWidth() - parentAlert.getLeftInset() - parentAlert.getRightInset();
-        float endHeight = parentAlert.getContainer().getHeight();
-
-        float fromX = cameraViewLocation[0];
-        float fromY = cameraViewLocation[1];
-        float toX = 0;
-        float toY = additionCloseCameraY;
-
-        if (value == 0) {
-            cameraIcon.setTranslationX(cameraViewLocation[0]);
-            cameraIcon.setTranslationY(cameraViewLocation[1] + cameraViewOffsetY);
-        }
-
-
-        int cameraViewW, cameraViewH;
-        FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) cameraView.getLayoutParams();
-
-        float textureStartHeight = cameraView.getTextureHeight(startWidth, startHeight);
-        float textureEndHeight = cameraView.getTextureHeight(endWidth, endHeight);
-
-        float fromScale = textureStartHeight / textureEndHeight;
-        float fromScaleY = startHeight / endHeight;
-        float fromScaleX = startWidth / endWidth;
-
-        if (cameraExpanded) {
-            cameraViewW = (int) endWidth;
-            cameraViewH = (int) endHeight;
-            final float s = fromScale * (1f - value) + value;
-            cameraView.getTextureView().setScaleX(s);
-            cameraView.getTextureView().setScaleY(s);
-
-            final float sX = fromScaleX * (1f - value) + value;
-            final float sY = fromScaleY * (1f - value) + value;
-
-            final float scaleOffsetY = (1 - sY) * endHeight / 2;
-            final float scaleOffsetX = (1 - sX) * endWidth / 2;
-
-            recorderView.setTranslationX(fromX * (1f - value) + toX * value - scaleOffsetX);
-            recorderView.setTranslationY(fromY * (1f - value) + toY * value - scaleOffsetY);
-            animationClipTop = fromY * (1f - value) - cameraView.getTranslationY();
-            animationClipBottom = ((fromY + startHeight) * (1f - value) - cameraView.getTranslationY()) + endHeight * value;
-
-            animationClipLeft = fromX * (1f - value) - cameraView.getTranslationX();
-            animationClipRight = ((fromX + startWidth) * (1f - value) - cameraView.getTranslationX()) + endWidth * value;
-        } else {
-            cameraViewW = (int) startWidth;
-            cameraViewH = (int) startHeight;
-            cameraView.getTextureView().setScaleX(1f);
-            cameraView.getTextureView().setScaleY(1f);
-            animationClipTop = 0;
-            animationClipBottom = endHeight;
-            animationClipLeft = 0;
-            animationClipRight = endWidth;
-
-            recorderView.setTranslationX(fromX);
-            recorderView.setTranslationY(fromY);
-        }
-
-        if (value <= 0.5f) {
-            cameraIcon.setAlpha(1.0f - value / 0.5f);
-        } else {
-            cameraIcon.setAlpha(0.0f);
-        }
-
-        if (layoutParams.width != cameraViewW || layoutParams.height != cameraViewH) {
-            layoutParams.width = cameraViewW;
-            layoutParams.height = cameraViewH;
-            recorderView.requestLayout();
-        }
-        if (Build.VERSION.SDK_INT >= 21) {
-            recorderView.invalidateOutline();
-        } else {
-            recorderView.invalidate();
-        }
-    }
-
-    @Keep
-    public float getCameraOpenProgress() {
-        return cameraOpenProgress;
-    }
 
     protected void checkCameraViewPosition() {
         if (PhotoViewer.hasInstance() && PhotoViewer.getInstance().stickerMakerView != null && PhotoViewer.getInstance().stickerMakerView.isThanosInProgress) {
