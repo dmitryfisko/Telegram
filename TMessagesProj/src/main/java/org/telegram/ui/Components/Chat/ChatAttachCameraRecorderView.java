@@ -262,7 +262,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         isReposting = false;
         prepareClosing = false;
 //        privacySelectorHintOpened = false;
-        forceBackgroundVisible = false;
         videoTextureHolder.active = false;
 
         // TODO
@@ -326,7 +325,8 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         cameraView.setTranslationX(0);
         cameraView.setTranslationY(0);
         containerView.setTranslationX(0);
-        cameraView.setTranslationY(0);
+        containerView.setTranslationY(0);
+        containerView.setTranslationY2(0);
         previewView.setTranslationX(0);
         previewView.setTranslationY(0);
 
@@ -378,7 +378,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             openCloseAnimator = ValueAnimator.ofFloat(openProgress, value);
             openCloseAnimator.addUpdateListener(anm -> {
                 openProgress = (float) anm.getAnimatedValue();
-                checkBackgroundVisibility();
                 containerView.invalidate();
                 windowView.invalidate();
                 if (openProgress < .3f && waveEffect != null) {
@@ -400,7 +399,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                     notificationsLocker.unlock();
                     NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.startAllHeavyOperations, 512);
                     NotificationCenter.getGlobalInstance().runDelayedNotifications();
-                    checkBackgroundVisibility();
 
                     if (onFullyOpenListener != null) {
                         onFullyOpenListener.run();
@@ -433,7 +431,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             if (onDone != null) {
                 onDone.run();
             }
-            checkBackgroundVisibility();
         }
         if (value > 0) {
             firstOpen = false;
@@ -687,6 +684,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                 allowModeScroll = true;
                 if (containerView.getTranslationY() > 0) {
                     if (dismissProgress > .4f) {
+                        navigateTo(PAGE_CAMERA, false);
                         close(true);
                     } else {
                         animateContainerBack();
@@ -862,6 +860,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                 if (scrollingY) {
                     if (Math.abs(containerView.getTranslationY1()) >= dp(1)) {
                         if (velocityY > 0 && Math.abs(velocityY) > 2000 && Math.abs(velocityY) > Math.abs(velocityX) || dismissProgress > .4f) {
+                            navigateTo(PAGE_CAMERA, false);
                             close(true);
                         } else {
                             animateContainerBack();
@@ -1194,7 +1193,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             super.setTranslationY((this.translationY1 = translationY) + translationY2);
 
             dismissProgress = Utilities.clamp(translationY / getMeasuredHeight() * 4, 1, 0);
-            checkBackgroundVisibility();
             windowView.invalidate();
 
             final float scale = 1f - .1f * Utilities.clamp(getTranslationY() / AndroidUtilities.dp(320), 1, 0);
@@ -2376,175 +2374,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             controlContainer.addView(draftSavedHint, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.FILL_HORIZONTAL, 0, 0, 0, 66 + 12));
         }
         return draftSavedHint;
-    }
-
-    private boolean preparingUpload = false;
-
-    private void upload(boolean asStory) {
-        if (preparingUpload) {
-            return;
-        }
-        preparingUpload = true;
-        applyPaintInBackground(() -> {
-            applyPaintMessage();
-            preparingUpload = false;
-            uploadInternal(asStory);
-        });
-    }
-
-    private void uploadInternal(boolean asStory) {
-        if (outputEntry == null) {
-            close(true);
-            return;
-        }
-        destroyPhotoFilterView();
-        prepareThumb(outputEntry, false);
-        MessagesController.getInstance(currentAccount).getStoriesController().uploadStory(outputEntry, asStory);
-        if (outputEntry.isDraft && !outputEntry.isEdit) {
-            MessagesController.getInstance(currentAccount).getStoriesController().getDraftsController().delete(outputEntry);
-        }
-        outputEntry.cancelCheckStickers();
-
-        long sendAsDialogId = UserConfig.getInstance(currentAccount).clientUserId;
-        if (outputEntry.peer != null && !(outputEntry.peer instanceof TLRPC.TL_inputPeerSelf)) {
-            sendAsDialogId = DialogObject.getPeerDialogId(outputEntry.peer);
-        }
-        outputEntry = null;
-
-        wasSend = true;
-        wasSendPeer = sendAsDialogId;
-        forceBackgroundVisible = true;
-        checkBackgroundVisibility();
-
-        long finalSendAsDialogId = sendAsDialogId;
-        Runnable runnable = () -> {
-            if (asStory) {
-                if (closeListener != null) {
-                    closeListener.run();
-                    closeListener = null;
-                }
-                closingSourceProvider = null;
-
-                if (activity instanceof LaunchActivity) {
-                    ((LaunchActivity) activity).drawerLayoutContainer.post(() -> {
-                        if (waveEffect != null) {
-                            waveEffect.prepare();
-                        }
-                        close(true);
-                    });
-                } else {
-                    close(true);
-                }
-            } else {
-                close(true);
-            }
-        };
-        if (closingSourceProvider != null) {
-            closingSourceProvider.preLayout(sendAsDialogId, runnable);
-        } else {
-            runnable.run();
-        }
-        MessagesController.getGlobalMainSettings().edit().putInt("storyhint2", 2).apply();
-    }
-
-    private File prepareThumb(StoryEntry storyEntry, boolean forDraft) {
-        if (storyEntry == null || previewView.getWidth() <= 0 || previewView.getHeight() <= 0) {
-            return null;
-        }
-//        if (!forDraft && !storyEntry.wouldBeVideo() && !storyEntry.isEdit) {
-//            return null;
-//        }
-        File file = forDraft ? storyEntry.draftThumbFile : storyEntry.uploadThumbFile;
-        if (file != null) {
-            file.delete();
-            file = null;
-        }
-
-        View previewView = collageLayoutView.hasLayout() ? collageLayoutView : this.previewView;
-
-        final float scale = forDraft ? 1 / 3f : 1f;
-        final int w = (int) (previewView.getWidth() * scale);
-        final int h = (int) (previewView.getHeight() * scale);
-        Bitmap bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.RGB_565);
-        Canvas canvas = new Canvas(bitmap);
-
-        canvas.save();
-        canvas.scale(scale, scale);
-        AndroidUtilities.makingGlobalBlurBitmap = true;
-        previewView.draw(canvas);
-        AndroidUtilities.makingGlobalBlurBitmap = false;
-        canvas.restore();
-
-        final Paint bitmapPaint = new Paint(Paint.FILTER_BITMAP_FLAG);
-
-        TextureView textureView = this.previewView.getTextureView();
-        if (storyEntry.isVideo && !storyEntry.isRepostMessage && textureView != null) {
-            Bitmap previewTextureView = textureView.getBitmap();
-            Matrix matrix = textureView.getTransform(null);
-            if (matrix != null) {
-                matrix = new Matrix(matrix);
-                matrix.postScale(scale, scale);
-            }
-            canvas.drawBitmap(previewTextureView, matrix, bitmapPaint);
-            previewTextureView.recycle();
-        }
-
-        if (storyEntry.paintBlurFile != null) {
-            try {
-                Bitmap paintBitmap = BitmapFactory.decodeFile(storyEntry.paintBlurFile.getPath());
-                canvas.save();
-                float scale2 = w / (float) paintBitmap.getWidth();
-                canvas.scale(scale2, scale2);
-                canvas.drawBitmap(paintBitmap, 0, 0, bitmapPaint);
-                canvas.restore();
-                paintBitmap.recycle();
-            } catch (Exception e) {
-                FileLog.e(e);
-            }
-        }
-
-        if (storyEntry.paintFile != null) {
-            try {
-                Bitmap paintBitmap = BitmapFactory.decodeFile(storyEntry.paintFile.getPath());
-                canvas.save();
-                float scale2 = w / (float) paintBitmap.getWidth();
-                canvas.scale(scale2, scale2);
-                canvas.drawBitmap(paintBitmap, 0, 0, bitmapPaint);
-                canvas.restore();
-                paintBitmap.recycle();
-            } catch (Exception e) {
-                FileLog.e(e);
-            }
-        }
-
-        if (paintView != null && paintView.entitiesView != null) {
-            canvas.save();
-            canvas.scale(scale, scale);
-            paintView.drawForThemeToggle = true;
-            paintView.entitiesView.drawForThumb = true;
-            paintView.entitiesView.draw(canvas);
-            paintView.entitiesView.drawForThumb = false;
-            paintView.drawForThemeToggle = false;
-            canvas.restore();
-        }
-
-        Bitmap thumbBitmap = Bitmap.createScaledBitmap(bitmap, 40, 22, true);
-
-        file = StoryEntry.makeCacheFile(currentAccount, false);
-        try {
-            bitmap.compress(Bitmap.CompressFormat.JPEG, forDraft ? 95 : 99, new FileOutputStream(file));
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        }
-        bitmap.recycle();
-
-        if (forDraft) {
-            storyEntry.draftThumbFile = file;
-        } else {
-            storyEntry.uploadThumbFile = file;
-        }
-        storyEntry.thumbBitmap = thumbBitmap;
-        return file;
     }
 
     private String flashButtonMode;
@@ -5489,21 +5318,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 
     public void removeNotificationObservers() {
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.albumsDidLoad);
-    }
-
-    private boolean isBackgroundVisible;
-    private boolean forceBackgroundVisible;
-
-    private void checkBackgroundVisibility() {
-        boolean shouldBeVisible = dismissProgress != 0 || openProgress < 1 || forceBackgroundVisible;
-        if (shouldBeVisible == isBackgroundVisible) {
-            return;
-        }
-        if (activity instanceof LaunchActivity) {
-            LaunchActivity launchActivity = (LaunchActivity) activity;
-            launchActivity.drawerLayoutContainer.setAllowDrawContent(shouldBeVisible);
-        }
-        isBackgroundVisible = shouldBeVisible;
     }
 
     public interface ClosingViewProvider {

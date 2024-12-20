@@ -1491,7 +1491,6 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                     dragging = false;
                     if (recorderView != null) {
                         if (Math.abs(recorderView.getTranslationY()) > recorderView.getMeasuredHeight() / 6.0f) {
-                            recorderView.onBackPressed();
                             closeCamera();
                         } else {
                             AnimatorSet animatorSet = new AnimatorSet();
@@ -1860,6 +1859,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         AndroidUtilities.setLightNavigationBar(parentAlert.getWindow(), false);
 
         parentAlert.occupyNavigationBar = true;
+        parentAlert.container.requestLayout();
 
         cameraOpened = true;
         cameraExpanded = true;
@@ -2261,6 +2261,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         }
 
         parentAlert.occupyNavigationBar = false;
+        parentAlert.container.requestLayout();
 
         animateCameraValues[1] = itemSize;
         animateCameraValues[2] = itemSize;
@@ -2274,7 +2275,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         cameraIcon.setVisibility(VISIBLE);
 
         AndroidUtilities.setLightNavigationBar(parentAlert.getWindow(), AndroidUtilities.computePerceivedBrightness(getThemedColor(Theme.key_windowBackgroundGray)) > 0.721);
-        applyCameraViewPosition();
+        checkCameraViewPosition();
     }
 
     float animationClipTop;
