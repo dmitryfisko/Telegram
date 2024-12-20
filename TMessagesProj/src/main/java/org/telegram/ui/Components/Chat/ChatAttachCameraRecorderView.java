@@ -43,11 +43,7 @@ import android.text.Layout;
 import android.text.SpannableString;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
-import android.text.TextPaint;
 import android.text.TextUtils;
-import android.text.style.CharacterStyle;
-import android.text.style.ClickableSpan;
-import android.text.style.ForegroundColorSpan;
 import android.text.style.ImageSpan;
 import android.util.Pair;
 import android.view.Gravity;
@@ -91,7 +87,6 @@ import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SendMessagesHelper;
-import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.UserObject;
 import org.telegram.messenger.Utilities;
 import org.telegram.messenger.VideoEditedInfo;
@@ -109,13 +104,11 @@ import org.telegram.ui.Components.BlurringShader;
 import org.telegram.ui.Components.Bulletin;
 import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.CubicBezierInterpolator;
-import org.telegram.ui.Components.EmojiView;
 import org.telegram.ui.Components.FilterShaders;
 import org.telegram.ui.Components.GestureDetectorFixDoubleTap;
 import org.telegram.ui.Components.ItemOptions;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.Paint.RenderView;
-import org.telegram.ui.Components.Paint.Views.EntityView;
 import org.telegram.ui.Components.Paint.Views.MessageEntityView;
 import org.telegram.ui.Components.Paint.Views.PhotoView;
 import org.telegram.ui.Components.Paint.Views.RoundView;
@@ -123,7 +116,6 @@ import org.telegram.ui.Components.PhotoFilterBlurControl;
 import org.telegram.ui.Components.PhotoFilterCurvesControl;
 import org.telegram.ui.Components.PhotoFilterTouchable;
 import org.telegram.ui.Components.PhotoFilterView;
-import org.telegram.ui.Components.Premium.LimitReachedBottomSheet;
 import org.telegram.ui.Components.Premium.PremiumFeatureBottomSheet;
 import org.telegram.ui.Components.RLottieDrawable;
 import org.telegram.ui.Components.RLottieImageView;
@@ -133,13 +125,10 @@ import org.telegram.ui.Components.URLSpanUserMention;
 import org.telegram.ui.Components.VideoEditTextureView;
 import org.telegram.ui.Components.WaveDrawable;
 import org.telegram.ui.Components.ZoomControlView;
-import org.telegram.ui.LaunchActivity;
 import org.telegram.ui.PremiumPreviewFragment;
 import org.telegram.ui.Stories.DarkThemeResourceProvider;
-import org.telegram.ui.Stories.StoriesController;
 import org.telegram.ui.Stories.StoryWaveEffectView;
 import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
-import org.telegram.ui.Stories.recorder.CaptionStory;
 import org.telegram.ui.Stories.recorder.CollageLayout;
 import org.telegram.ui.Stories.recorder.CollageLayoutButton;
 import org.telegram.ui.Stories.recorder.CollageLayoutView2;
@@ -171,13 +160,13 @@ import org.telegram.ui.Stories.recorder.VideoTimerView;
 import org.telegram.ui.WrappedResourceProvider;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
 public class ChatAttachCameraRecorderView extends FrameLayout implements NotificationCenter.NotificationCenterDelegate {
 
+    private static final long MAX_RECORDING_DURATION = 30 * 60 * 1000L;
 
     private final Theme.ResourcesProvider resourcesProvider = new DarkThemeResourceProvider();
 
@@ -2068,7 +2057,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             MediaController.loadGalleryPhotosAlbums(0);
         }
 
-        recordControl = new RecordControl(context);
+        recordControl = new RecordControl(context, MAX_RECORDING_DURATION);
         recordControl.setDelegate(recordControlDelegate);
         recordControl.startAsVideo(isVideo);
         controlContainer.addView(recordControl, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 100, Gravity.BOTTOM | Gravity.FILL_HORIZONTAL, 0, 0, 0, 64));

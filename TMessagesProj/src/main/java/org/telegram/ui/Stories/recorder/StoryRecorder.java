@@ -24,7 +24,6 @@ import android.graphics.BitmapFactory;
 import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.Insets;
 import android.graphics.LinearGradient;
 import android.graphics.Matrix;
 import android.graphics.Outline;
@@ -57,7 +56,6 @@ import android.text.style.ClickableSpan;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.ImageSpan;
 import android.text.style.URLSpan;
-import android.util.Log;
 import android.util.Pair;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
@@ -1804,6 +1802,8 @@ public class StoryRecorder implements NotificationCenter.NotificationCenterDeleg
         }
     }
 
+    private static final long MAX_RECORDING_DURATION = 30 * 60 * 1000L;
+
     public static final int PAGE_CAMERA = 0;
     public static final int PAGE_PREVIEW = 1;
     public static final int PAGE_COVER = 2;
@@ -2785,7 +2785,7 @@ public class StoryRecorder implements NotificationCenter.NotificationCenterDeleg
             MediaController.loadGalleryPhotosAlbums(0);
         }
 
-        recordControl = new RecordControl(context);
+        recordControl = new RecordControl(context, MAX_RECORDING_DURATION);
         recordControl.setDelegate(recordControlDelegate);
         recordControl.startAsVideo(isVideo);
         controlContainer.addView(recordControl, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 100, Gravity.BOTTOM | Gravity.FILL_HORIZONTAL));
