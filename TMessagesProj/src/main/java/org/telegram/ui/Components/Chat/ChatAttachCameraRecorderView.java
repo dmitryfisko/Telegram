@@ -2689,10 +2689,13 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                         outputEntry.height = height;
                         outputEntry.setupMatrix();
                     }
-                    navigateToPreviewWithPlayerAwait(() ->
-                    {
+                    if (outputEntry.collageContent != null && !outputEntry.collageContent.isEmpty()) {
+                        navigateToPreviewWithPlayerAwait(() -> {
+                            cameraEntryCreatedListener.onCameraEntryCreated(outputEntry);
+                        }, 0);
+                    } else {
                         cameraEntryCreatedListener.onCameraEntryCreated(outputEntry);
-                    }, 0);
+                    }
                 }
             }, () /* onVideoStart */ -> {
                 whenStarted.run();
