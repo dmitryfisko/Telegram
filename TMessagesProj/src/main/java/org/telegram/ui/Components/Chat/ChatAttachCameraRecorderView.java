@@ -64,6 +64,7 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.ColorUtils;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.dynamicanimation.animation.DynamicAnimation;
@@ -253,11 +254,12 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 //        privacySelectorHintOpened = false;
         videoTextureHolder.active = false;
 
-        // TODO
-//        if (windowManager != null && windowView != null && windowView.getParent() == null) {
-//            AndroidUtilities.setPreferredMaxRefreshRate(windowManager, windowView, windowLayoutParams);
-//            windowManager.addView(windowView, windowLayoutParams);
-//        }
+        WindowManager windowManager = ContextCompat.getSystemService(getContext(), WindowManager.class);
+        final WindowManager.LayoutParams windowAttributes = window.getAttributes();
+        final View decorView = window.getDecorView();
+        if (windowManager != null && decorView.getParent() == null) {
+            AndroidUtilities.setPreferredMaxRefreshRate(windowManager, decorView, windowAttributes);
+        }
 
         cameraViewThumb.setImageDrawable(getCameraThumb());
 
