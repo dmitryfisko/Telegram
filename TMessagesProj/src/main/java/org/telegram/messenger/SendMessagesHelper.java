@@ -16,6 +16,7 @@ import android.content.res.AssetFileDescriptor;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.drawable.BitmapDrawable;
@@ -9224,6 +9225,33 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
             } catch (Exception e) {
                 FileLog.e(e);
             }
+        }
+    }
+
+    public static File createVideoThumbnailPath(String recordedFile) {
+        try {
+            final Bitmap bitmap = SendMessagesHelper.createVideoThumbnail(recordedFile, MediaStore.Video.Thumbnails.MINI_KIND);
+
+            String fileName = Integer.MIN_VALUE + "_" + SharedConfig.getLastLocalId() + ".jpg";
+            File cacheFile = new File(FileLoader.getDirectory(FileLoader.MEDIA_DIR_CACHE), fileName);
+            FileOutputStream stream = null;
+            try {
+                stream = new FileOutputStream(cacheFile);
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 87, stream);
+            } catch (Throwable e) {
+                FileLog.e(e);
+            } finally {
+                if (stream != null) {
+                    try {
+                        stream.close();
+                    } catch (Throwable ignore) {
+                    }
+                }
+            }
+
+            return cacheFile;
+        } catch (Exception e) {
+            return null;
         }
     }
 

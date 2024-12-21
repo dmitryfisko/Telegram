@@ -343,7 +343,7 @@ public class ImageUpdater implements NotificationCenter.NotificationCenterDelega
 
     public boolean dismissCurrentDialog(Dialog dialog) {
         if (chatAttachAlert != null && dialog == chatAttachAlert) {
-            chatAttachAlert.getPhotoLayout().closeCamera(false);
+            chatAttachAlert.getPhotoLayout().closeCamera();
             chatAttachAlert.dismissInternal();
             chatAttachAlert.getPhotoLayout().hideCamera(true);
             return true;

@@ -93,6 +93,7 @@ import org.telegram.ui.Components.VideoPlayer;
 import org.telegram.ui.LaunchActivity;
 import org.telegram.ui.PhotoViewer;
 import org.telegram.ui.Stories.DarkThemeResourceProvider;
+import org.telegram.ui.Stories.recorder.StoryEntry;
 
 import java.io.File;
 import java.io.FileDescriptor;
@@ -395,6 +396,8 @@ public class MediaController implements AudioManager.OnAudioFocusChangeListener,
         public boolean isCropped;
         public int ttl;
         public long effectId;
+
+        public ArrayList<PhotoEntry> collageContent;
 
         public CropState cropState;
 

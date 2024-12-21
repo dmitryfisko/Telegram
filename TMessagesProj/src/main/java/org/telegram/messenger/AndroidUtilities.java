@@ -30,6 +30,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.Signature;
 import android.content.res.AssetFileDescriptor;
 import android.content.res.Configuration;
+import android.content.res.Resources;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -75,6 +76,7 @@ import android.text.style.DynamicDrawableSpan;
 import android.text.style.URLSpan;
 import android.text.util.Linkify;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.util.Pair;
 import android.util.StateSet;
 import android.util.TypedValue;
@@ -6313,5 +6315,4 @@ public class AndroidUtilities {
             listView.getAdapter().notifyDataSetChanged();
         }
     }
-
 }

@@ -255,7 +255,6 @@ import org.telegram.ui.Stories.recorder.StoryEntry;
 import org.telegram.ui.Stories.recorder.StoryRecorder;
 import org.telegram.ui.bots.BotAdView;
 import org.telegram.ui.bots.BotCommandsMenuView;
-import org.telegram.ui.bots.BotWebViewAttachedSheet;
 import org.telegram.ui.bots.BotWebViewSheet;
 import org.telegram.ui.bots.WebViewRequestProps;
 
@@ -27581,7 +27580,7 @@ public class ChatActivity extends BaseFragment implements NotificationCenter.Not
     @Override
     public void dismissCurrentDialog() {
         if (chatAttachAlert != null && visibleDialog == chatAttachAlert) {
-            chatAttachAlert.getPhotoLayout().closeCamera(false);
+            chatAttachAlert.getPhotoLayout().closeCamera();
             chatAttachAlert.dismissInternal();
             chatAttachAlert.getPhotoLayout().hideCamera(true);
             return;

@@ -7,6 +7,7 @@ import static org.telegram.messenger.AndroidUtilities.lerp;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.LinearGradient;
 import android.graphics.Matrix;
 import android.graphics.Paint;
@@ -48,7 +49,6 @@ import org.telegram.ui.Components.CubicBezierInterpolator;
 import org.telegram.ui.Components.ItemOptions;
 import org.telegram.ui.Components.Scroller;
 import org.telegram.ui.Components.Text;
-import org.telegram.ui.Stories.StoriesViewPager;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;

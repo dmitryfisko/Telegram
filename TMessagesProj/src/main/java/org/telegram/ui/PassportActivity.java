@@ -1346,7 +1346,7 @@ public class PassportActivity extends BaseFragment implements NotificationCenter
     @Override
     public void dismissCurrentDialog() {
         if (chatAttachAlert != null && visibleDialog == chatAttachAlert) {
-            chatAttachAlert.getPhotoLayout().closeCamera(false);
+            chatAttachAlert.getPhotoLayout().closeCamera();
             chatAttachAlert.dismissInternal();
             chatAttachAlert.getPhotoLayout().hideCamera(true);
             return;

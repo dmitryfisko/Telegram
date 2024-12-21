@@ -20,7 +20,6 @@ import android.os.Build;
 import android.text.Layout;
 import android.text.StaticLayout;
 import android.text.TextPaint;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -43,7 +42,6 @@ import org.telegram.messenger.VideoEncodingService;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.AnimatedFloat;
-import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.ButtonBounce;
 import org.telegram.ui.Components.CircularProgressDrawable;
 import org.telegram.ui.Components.CubicBezierInterpolator;
@@ -84,6 +82,16 @@ public class DownloadButton extends ImageView {
         progressDrawable = new CircularProgressDrawable(dp(18), dp(2), 0xffffffff);
 
         updateImage();
+    }
+
+    public interface OnGenerationDoneListener {
+        void onGenerationDone(File savedToGalleryFile, boolean video);
+    }
+
+    private OnGenerationDoneListener onGenerationDoneListener;
+
+    public void setOnGenerationDoneListener(OnGenerationDoneListener onGenerationDoneListener) {
+        this.onGenerationDoneListener = onGenerationDoneListener;
     }
 
     private StoryEntry currentEntry;
@@ -183,11 +191,16 @@ public class DownloadButton extends ImageView {
                     if (!downloading || currentEntry == null) {
                         return;
                     }
-                    toast.setDone(R.raw.ic_save_to_gallery, LocaleController.getString("VideoSavedHint"), 3500);
                     downloading = false;
                     updateImage();
 
                     savedToGalleryUri = uri;
+
+                    if (onGenerationDoneListener != null) {
+                        onGenerationDoneListener.onGenerationDone(file, true);
+                    } else {
+                        toast.setDone(R.raw.ic_save_to_gallery, LocaleController.getString("VideoSavedHint"), 3500);
+                    }
                 }, false);
             }, progress -> {
                 if (toast != null) {
@@ -219,15 +232,20 @@ public class DownloadButton extends ImageView {
                     MediaController.saveFile(file.getAbsolutePath(), getContext(), 0, null, null, uri -> {
                         downloading = false;
                         updateImage();
-                        if (toast != null) {
-                            toast.hide();
-                            toast = null;
-                        }
-                        toast = new PreparingVideoToast(getContext());
-                        toast.setDone(R.raw.ic_save_to_gallery, LocaleController.getString("PhotoSavedHint"), 2500);
-                        container.addView(toast);
-
                         savedToGalleryUri = uri;
+
+                        if (onGenerationDoneListener != null) {
+                            onGenerationDoneListener.onGenerationDone(file, false);
+                        } else {
+                            if (toast != null) {
+                                toast.hide();
+                                toast = null;
+                            }
+                            toast = new PreparingVideoToast(getContext());
+                            toast.setDone(R.raw.ic_save_to_gallery, LocaleController.getString("PhotoSavedHint"), 2500);
+                            container.addView(toast);
+                        }
+
                     }, false);
                 });
             });
@@ -355,7 +373,8 @@ public class DownloadButton extends ImageView {
                         if (file != null) {
                             file.delete();
                         }
-                    } catch (Exception ignore) {}
+                    } catch (Exception ignore) {
+                    }
                     onCancel.run();
                 }
             }
@@ -444,19 +463,19 @@ public class DownloadButton extends ImageView {
             final float prepareWidth = Math.max(preparingLayoutWidth, dp(54)) + dp(21 + 21);
             final float prepareHeight = dp(21 + 54 + 18 + 18) + preparingLayout.getHeight();
             prepareRect.set(
-                (getWidth() - prepareWidth) / 2f,
-                (getHeight() - prepareHeight) / 2f,
-                (getWidth() + prepareWidth) / 2f,
-                (getHeight() + prepareHeight) / 2f
+                    (getWidth() - prepareWidth) / 2f,
+                    (getHeight() - prepareHeight) / 2f,
+                    (getWidth() + prepareWidth) / 2f,
+                    (getHeight() + prepareHeight) / 2f
             );
 
             final float toastWidth = dp(9 + 36 + 7 + 22) + doneLayoutWidth;
             final float toastHeight = dp(6 + 36 + 6);
             toastRect.set(
-                (getWidth() - toastWidth) / 2f,
-                (getHeight() - toastHeight) / 2f,
-                (getWidth() + toastWidth) / 2f,
-                (getHeight() + toastHeight) / 2f
+                    (getWidth() - toastWidth) / 2f,
+                    (getHeight() - toastHeight) / 2f,
+                    (getWidth() + toastWidth) / 2f,
+                    (getHeight() + toastHeight) / 2f
             );
 
             AndroidUtilities.lerp(prepareRect, toastRect, t, currentRect);
@@ -513,8 +532,8 @@ public class DownloadButton extends ImageView {
 
             canvas.save();
             canvas.translate(
-                prepareRect.left + dp(21) - preparingLayoutLeft,
-                prepareRect.bottom - dp(18) - preparingLayout.getHeight()
+                    prepareRect.left + dp(21) - preparingLayoutLeft,
+                    prepareRect.bottom - dp(18) - preparingLayout.getHeight()
             );
             textPaint.setAlpha((int) (0xFF * alpha));
             preparingLayout.draw(canvas);
@@ -525,10 +544,10 @@ public class DownloadButton extends ImageView {
             if (lottieDrawable != null) {
                 lottieDrawable.setAlpha((int) (0xFF * alpha));
                 lottieDrawable.setBounds(
-                    (int) (toastRect.left + dp(9)),
-                    (int) (toastRect.top + dp(6)),
-                    (int) (toastRect.left + dp(9 + 36)),
-                    (int) (toastRect.top + dp(6 + 36))
+                        (int) (toastRect.left + dp(9)),
+                        (int) (toastRect.top + dp(6)),
+                        (int) (toastRect.left + dp(9 + 36)),
+                        (int) (toastRect.top + dp(6 + 36))
                 );
                 lottieDrawable.draw(canvas);
             }
@@ -570,6 +589,7 @@ public class DownloadButton extends ImageView {
         }
 
         private Runnable hideRunnable;
+
         public void hide() {
             if (hideRunnable != null) {
                 AndroidUtilities.cancelRunOnUIThread(hideRunnable);
@@ -585,6 +605,7 @@ public class DownloadButton extends ImageView {
         }
 
         private Runnable onCancel;
+
         public void setOnCancelListener(Runnable onCancel) {
             this.onCancel = onCancel;
         }
