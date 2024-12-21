@@ -1830,7 +1830,7 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                 entry.isVideo = video;
                 AndroidUtilities.runOnUIThread(() -> {
                     cameraEntryCreatedListener.onCameraEntryCreated(entry);
-                    AndroidUtilities.runOnUIThread(() -> navigateTo(PAGE_CAMERA, true));
+                    AndroidUtilities.runOnUIThread(() -> navigateTo(PAGE_CAMERA, false));
                 });
             });
         });
@@ -3331,7 +3331,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
                     storyEntry = (StoryEntry) entry;
                     if (storyEntry.file == null && !storyEntry.isCollage()) {
                         downloadButton.showToast(R.raw.error, "Failed to load draft");
-                        MessagesController.getInstance(currentAccount).getStoriesController().getDraftsController().delete(storyEntry);
                         return;
                     }
                     storyEntry.botId = botId;
@@ -3765,8 +3764,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
             MediaDataController.getInstance(currentAccount).checkStickers(MediaDataController.TYPE_IMAGE);
             MediaDataController.getInstance(currentAccount).loadRecents(MediaDataController.TYPE_IMAGE, false, true, false);
             MediaDataController.getInstance(currentAccount).loadRecents(MediaDataController.TYPE_FAVE, false, true, false);
-            MessagesController.getInstance(currentAccount).getStoriesController().loadBlocklistAtFirst();
-            MessagesController.getInstance(currentAccount).getStoriesController().loadSendAs();
         }
     }
 
@@ -5151,10 +5148,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
 //            });
         }
         builder.setPositiveButton(outputEntry != null && outputEntry.isDraft && !outputEntry.isEdit ? getString(R.string.StoryDeleteDraft) : getString(R.string.Discard), (dialogInterface, i) -> {
-            if (outputEntry != null && !(outputEntry.isEdit || outputEntry.isRepost && !outputEntry.isRepostMessage) && outputEntry.isDraft) {
-                MessagesController.getInstance(currentAccount).getStoriesController().getDraftsController().delete(outputEntry);
-                outputEntry = null;
-            }
             if (outputEntry != null && (outputEntry.isEdit || outputEntry.isRepost && !outputEntry.isRepostMessage)) {
                 close(true);
             } else {
@@ -5259,8 +5252,6 @@ public class ChatAttachCameraRecorderView extends FrameLayout implements Notific
         if (previewView != null) {
             previewView.updatePauseReason(0, false);
         }
-
-        MessagesController.getInstance(currentAccount).getStoriesController().getDraftsController().load();
     }
 
     private void onPauseInternal() {
